@@ -148,3 +148,18 @@ An Android APK cannot provide Apple Watch sensor access.
 The APKs use the previous debug certificate for test-installation updates, not
 store signing. Published files are listed in `downloads/SHA256SUMS.txt`; the
 public download is checked against the local checksum after publication.
+
+## Optional test-history import helper
+
+The separate administrative seeder and fixture are documented in
+[demo-data.md](demo-data.md). Six generator tests and eleven seeder tests pass;
+the backend suite now has 28 passing tests, with its existing provider responses
+still simulated. A separate Dart consumer test restored the actual fixture
+through AppStore, verified 36 workouts / 572 sets and 7/28/90 counts of
+3 / 12 / 36, and generated a valid 19,395-byte PDF. These checks do not require
+a new mobile build; application source and the APKs are unchanged.
+
+The actual administrative read attempt in this cloud environment failed with
+`app/invalid-credential`: the configured credential object lacked `client_email`.
+The helper's real dry-run failed at the same prerequisite. No target account or
+Firestore document was read or changed, and no real seeding success is claimed.

@@ -84,6 +84,13 @@ over `FIREBASE_API_KEY` and `FIREBASE_APP_ID`. The iOS bundle ID is
 `com.pifit.app`. `FIREBASE_AUTH_DOMAIN` and `FIREBASE_STORAGE_BUCKET` are optional.
 Keep provider secrets and service-account files out of every client config.
 
+## Test data for progress and exports
+
+A tested administrative helper can append 36 labelled synthetic workouts to an
+existing account backup, preserving its current data. It requires authenticated
+Google administrative access; public SDK config alone is insufficient. See
+[the test-history import instructions](../docs/demo-data.md).
+
 ## Accounts and cloud backups
 
 The app supports email/password signup and login, password reset, email

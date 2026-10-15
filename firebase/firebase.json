@@ -6,14 +6,31 @@
     {
       "source": "functions",
       "codebase": "pi-fit-coach",
-      "ignore": ["node_modules", ".git", "firebase-debug.log", ".env*", "test"],
-      "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        ".env*",
+        "test",
+        "scripts"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
     }
   ],
   "emulators": {
-    "auth": {"port": 9099},
-    "firestore": {"port": 8080},
-    "functions": {"port": 5001},
-    "ui": {"enabled": true}
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": true
+    }
   }
 }
