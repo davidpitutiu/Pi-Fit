@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+task_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-/workspace/.config}"
+export DART_DATA_HOME="${DART_DATA_HOME:-/workspace/.dart-data}"
+export PUB_CACHE="${PUB_CACHE:-/workspace/.pub-cache}"
+export ANALYZER_STATE_LOCATION_OVERRIDE="${ANALYZER_STATE_LOCATION_OVERRIDE:-/workspace/.dart-analysis}"
+export FLUTTER_SUPPRESS_ANALYTICS=true
+export DASH__SUPPRESS_ANALYTICS=true
+if [[ -x /workspace/jdk21/bin/javac && ! -x "${JAVA_HOME:-/nonexistent}/bin/javac" ]]; then
+  export JAVA_HOME=/workspace/jdk21
+fi
+if [[ -d /workspace/android-sdk ]]; then
+  export ANDROID_HOME="${ANDROID_HOME:-/workspace/android-sdk}"
+  export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+  export ANDROID_USER_HOME="${ANDROID_USER_HOME:-/workspace/.android}"
+  export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/workspace/.gradle}"
+fi
+task_flutter="${PI_FIT_FLUTTER_BIN:-/workspace/flutter-sdk/bin/flutter}"
+if [[ ! -x "$task_flutter" ]]; then
+  task_flutter="$(command -v flutter || true)"
+fi
+if [[ -z "$task_flutter" ]]; then
+  echo 'Instalează Flutter 3.47.7 și setează PI_FIT_FLUTTER_BIN sau PATH.' >&2
+  exit 1
+fi
+cd "$task_root"
+exec "$task_flutter" "$@"

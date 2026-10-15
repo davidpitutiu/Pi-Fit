@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, delete: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['displayName', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100
+        && request.resource.data.updatedAt == request.time;
+
+      match /backups/{backupId} {
+        allow read, delete: if owner(uid);
+        allow create, update: if owner(uid)
+          && backupId == 'current'
+          && request.resource.data.keys().hasAll(['schemaVersion', 'updatedAt', 'data'])
+          && request.resource.data.keys().hasOnly(['schemaVersion', 'updatedAt', 'data'])
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.data is map;
+      }
+    }
+
+    // Includes _coachRateLimits: only the server Admin SDK accesses it.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

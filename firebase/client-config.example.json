@@ -1,0 +1,13 @@
+{
+  "FIREBASE_API_KEY": "replace-with-your-Firebase-api-key",
+  "FIREBASE_ANDROID_API_KEY": "",
+  "FIREBASE_IOS_API_KEY": "",
+  "FIREBASE_WEB_API_KEY": "",
+  "FIREBASE_PROJECT_ID": "pi-fit-663f2",
+  "FIREBASE_MESSAGING_SENDER_ID": "replace-with-your-sender-id",
+  "FIREBASE_ANDROID_APP_ID": "replace-with-your-Android-app-id",
+  "FIREBASE_IOS_APP_ID": "replace-with-your-iOS-app-id",
+  "FIREBASE_WEB_APP_ID": "replace-with-your-web-app-id",
+  "FIREBASE_IOS_BUNDLE_ID": "com.pifit.app",
+  "AI_COACH_URL": ""
+}

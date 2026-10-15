@@ -1,0 +1,7 @@
+functions/node_modules/
+functions/lib/
+.env*
+.secret*
+*.local
+client-config.local.json
+*-debug.log*

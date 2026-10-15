@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Pi Fit — antrenamentele tale, progres măsurabil și un antrenor AI mereu alături.">
+  <meta name="theme-color" content="#BCFF35">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pi Fit">
+  <meta name="color-scheme" content="dark light">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="manifest" href="manifest.json">
+  <title>Pi Fit · Make progress.</title>
+  <style>
+    :root { color-scheme: dark light; --background: #0c0f0c; --text: #f6f8f1; --muted: #8b9186; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; background: var(--background); }
+    #launch { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .mark { display: grid; place-items: center; width: 84px; height: 84px; border-radius: 25px; background: #bcff35; color: #0c0f0c; }
+    .mark svg { width: 48px; height: 48px; }
+    h1 { margin: 23px 0 9px; font-size: 34px; font-weight: 760; letter-spacing: -1.7px; }
+    p { margin: 0; color: var(--muted); font-size: 14px; }
+    .loading { width: 26px; height: 26px; margin-top: 38px; border: 2px solid #bcff3529; border-top-color: #bcff35; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-color-scheme: light) { :root { --background: #f6f7f2; --text: #11150e; --muted: #747b6f; } }
+    @media (prefers-reduced-motion: reduce) { .loading { animation: none; } }
+  </style>
+</head>
+<body>
+  <div id="launch" role="status" aria-label="Pi Fit se încarcă">
+    <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v3h-3v11h-3V8h-4v11H7V8H4z"/></svg></div>
+    <h1>Pi Fit</h1>
+    <p>Make progress. Every day.</p>
+    <div class="loading" aria-hidden="true"></div>
+  </div>
+  <noscript>Activează JavaScript pentru a folosi Pi Fit.</noscript>
+  <script>
+    window.addEventListener('flutter-first-frame', () => document.getElementById('launch')?.remove());
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
