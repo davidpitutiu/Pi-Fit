@@ -1,57 +1,192 @@
 #!/usr/bin/env python3
-"""Convert downloaded public Firebase client configuration to Dart defines.
+"""Generate bundled public Firebase options, native files and optional Dart defines.
 
-Never accepts service account files; only writes an ignored local client file.
+Only public client configuration is accepted. Provider keys and service-account
+credentials must never be placed in the app or generated public files.
 """
 import argparse
 import json
 import plistlib
+import re
 from pathlib import Path
 
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--android', type=Path, help='google-services.json')
-parser.add_argument('--ios', type=Path, help='GoogleService-Info.plist')
-parser.add_argument('--web', type=Path, help='JSON Firebase web config object')
-args = parser.parse_args()
-if not any((args.android, args.ios, args.web)):
-    parser.error('Furnizează cel puțin --android, --ios sau --web.')
-output = Path(__file__).resolve().parent.parent / 'firebase/client-config.local.json'
-config = json.loads(output.read_text()) if output.exists() else {'AI_COACH_URL': ''}
+PROJECT_ID = 'pi-fit-663f2'
+SENDER_ID = '942783822335'
+BUNDLE_ID = 'com.pifit.app'
+FORBIDDEN_KEYS = {'private_key', 'private_key_id', 'client_email', 'client_secret',
+                  'refresh_token', 'service_account', 'openai_api_key'}
 
 
-def project(project_id, sender):
-    existing = config.get('FIREBASE_PROJECT_ID')
-    if existing and existing != project_id:
-        raise ValueError('Configurațiile trebuie să aparțină aceluiași proiect Firebase.')
-    if project_id != 'pi-fit-663f2':
-        raise ValueError('Proiectul așteptat este pi-fit-663f2. Verifică fișierul selectat.')
-    config.update(FIREBASE_PROJECT_ID=project_id, FIREBASE_MESSAGING_SENDER_ID=str(sender))
+def reject_server_credentials(value):
+    if isinstance(value, dict):
+        if any(str(key).lower() in FORBIDDEN_KEYS for key in value):
+            raise ValueError('Sunt acceptate numai configurații publice de client, fără credențiale de server.')
+        for child in value.values():
+            reject_server_credentials(child)
+    elif isinstance(value, list):
+        for child in value:
+            reject_server_credentials(child)
 
 
-if args.android:
-    data = json.loads(args.android.read_text())
-    if 'private_key' in data or 'client_email' in data:
-        raise ValueError('Nu folosi un service account. Este necesar google-services.json public al aplicației Android.')
-    project(data['project_info']['project_id'], data['project_info']['project_number'])
-    clients = [client for client in data['client'] if client['client_info'].get('android_client_info', {}).get('package_name') == 'com.pifit.app']
+def verify_project(project_id, sender_id):
+    if project_id != PROJECT_ID or str(sender_id) != SENDER_ID:
+        raise ValueError('Configurația trebuie să aparțină proiectului pi-fit-663f2 și expeditorului său.')
+
+
+def text(value, field):
+    if not isinstance(value, str) or not value.strip() or value.startswith('replace-with'):
+        raise ValueError(f'Câmpul public {field} este incomplet.')
+    return value.strip()
+
+
+def verify_app_id(value, platform):
+    value = text(value, 'appId')
+    if not re.fullmatch(r'1:' + SENDER_ID + ':' + platform + r':[A-Za-z0-9]+', value):
+        raise ValueError(f'ID-ul aplicației nu corespunde platformei {platform} sau proiectului.')
+    return value
+
+
+def android_config(path):
+    data = json.loads(path.read_text(encoding='utf-8'))
+    reject_server_credentials(data)
+    info = data['project_info']
+    verify_project(info['project_id'], info['project_number'])
+    clients = [client for client in data['client']
+               if client['client_info'].get('android_client_info', {}).get('package_name') == BUNDLE_ID]
     if len(clients) != 1:
         raise ValueError('Nu există o configurație Android unică pentru com.pifit.app.')
     client = clients[0]
-    config['FIREBASE_ANDROID_APP_ID'] = client['client_info']['mobilesdk_app_id']
-    config['FIREBASE_ANDROID_API_KEY'] = client['api_key'][0]['current_key']
-if args.ios:
-    with args.ios.open('rb') as source:
-        data = plistlib.load(source)
-    if data['BUNDLE_ID'] != 'com.pifit.app':
+    return {
+        'apiKey': text(client['api_key'][0]['current_key'], 'apiKey'),
+        'appId': verify_app_id(client['client_info']['mobilesdk_app_id'], 'android'),
+        'projectId': PROJECT_ID, 'messagingSenderId': SENDER_ID,
+        'storageBucket': info.get('storage_bucket', ''),
+    }
+
+
+def ios_config(path):
+    data = plistlib.loads(path.read_bytes())
+    reject_server_credentials(data)
+    verify_project(data['PROJECT_ID'], data['GCM_SENDER_ID'])
+    if data['BUNDLE_ID'] != BUNDLE_ID:
         raise ValueError('Bundle ID trebuie să fie com.pifit.app.')
-    project(data['PROJECT_ID'], data['GCM_SENDER_ID'])
-    config.update(FIREBASE_IOS_APP_ID=data['GOOGLE_APP_ID'], FIREBASE_IOS_API_KEY=data['API_KEY'], FIREBASE_IOS_BUNDLE_ID=data['BUNDLE_ID'])
-if args.web:
-    data = json.loads(args.web.read_text())
-    if 'private_key' in data or 'client_email' in data:
-        raise ValueError('Fișierul trebuie să conțină configurația publică web, fără chei private.')
-    project(data['projectId'], data['messagingSenderId'])
-    config.update(FIREBASE_WEB_APP_ID=data['appId'], FIREBASE_WEB_API_KEY=data['apiKey'], FIREBASE_AUTH_DOMAIN=data.get('authDomain', 'pi-fit-663f2.firebaseapp.com'))
-output.parent.mkdir(parents=True, exist_ok=True)
-output.write_text(json.dumps(config, indent=2) + '\n')
-print('Configurația publică de client a fost salvată în firebase/client-config.local.json (ignorat de Git).')
+    return {
+        'apiKey': text(data['API_KEY'], 'apiKey'),
+        'appId': verify_app_id(data['GOOGLE_APP_ID'], 'ios'),
+        'projectId': PROJECT_ID, 'messagingSenderId': SENDER_ID,
+        'storageBucket': data.get('STORAGE_BUCKET', ''), 'iosBundleId': BUNDLE_ID,
+    }
+
+
+def web_config(path):
+    data = json.loads(path.read_text(encoding='utf-8'))
+    reject_server_credentials(data)
+    verify_project(data['projectId'], data['messagingSenderId'])
+    data['appId'] = verify_app_id(data['appId'], 'web')
+    data['apiKey'] = text(data['apiKey'], 'apiKey')
+    data['authDomain'] = data.get('authDomain') or f'{PROJECT_ID}.firebaseapp.com'
+    allowed = {'apiKey', 'appId', 'messagingSenderId', 'projectId', 'authDomain',
+               'storageBucket', 'measurementId', 'databaseURL'}
+    return {key: value for key, value in data.items() if key in allowed}
+
+
+def dart_string(value):
+    return "'" + str(value).replace('\\', '\\\\').replace("'", "\\'").replace('$', '\\$').replace('\n', '\\n').replace('\r', '\\r') + "'"
+
+
+def generate_dart(platforms):
+    lines = [
+        '// Generated by scripts/configure_firebase.py from public client files.',
+        '// These project identifiers/API keys are public client configuration.',
+        '// Authorization is enforced by Firebase Auth and Firestore rules.',
+        "import 'package:firebase_core/firebase_core.dart';",
+        "import 'package:flutter/foundation.dart';", '',
+        'class DefaultFirebaseOptions {',
+        '  static FirebaseOptions get currentPlatform {',
+        '    final options = forPlatform(defaultTargetPlatform, isWeb: kIsWeb);',
+        '    if (options == null) {',
+        "      throw UnsupportedError('Firebase este disponibil pe Android, iOS și Web.');",
+        '    }', '    return options;', '  }', '',
+        '  static FirebaseOptions? forPlatform(TargetPlatform platform, {bool isWeb = false}) {',
+        '    if (isWeb) return web;',
+        '    return switch (platform) {',
+        '      TargetPlatform.android => android,',
+        '      TargetPlatform.iOS => ios,',
+        '      _ => null,', '    };', '  }', '',
+    ]
+    for platform in ['android', 'ios', 'web']:
+        lines.append(f'  static const {platform} = FirebaseOptions(')
+        for key in ['apiKey', 'appId', 'messagingSenderId', 'projectId', 'authDomain',
+                    'storageBucket', 'iosBundleId', 'measurementId', 'databaseURL']:
+            if platforms[platform].get(key):
+                lines.append(f'    {key}: {dart_string(platforms[platform][key])},')
+        lines.extend(['  );', ''])
+    lines.extend(['}', ''])
+    return '\n'.join(lines)
+
+
+def configure(root, *, android=None, ios=None, web=None, web_app_id=None):
+    root = Path(root)
+    android_source = Path(android) if android else root / 'android/app/google-services.json'
+    ios_source = Path(ios) if ios else root / 'ios/Runner/GoogleService-Info.plist'
+    web_source = Path(web) if web else root / 'firebase/web-config.json'
+    if not android_source.is_file() or not ios_source.is_file():
+        raise ValueError('Sunt necesare fișierele publice Android și iOS pentru a genera configurația inclusă.')
+    platforms = {'android': android_config(android_source), 'ios': ios_config(ios_source)}
+    if web_source.is_file():
+        platforms['web'] = web_config(web_source)
+    elif web_app_id:
+        # A Firebase API key identifies the project; this minimal config reuses
+        # the Android public key until the full Web export is provided.
+        platforms['web'] = {
+            **platforms['android'],
+            'appId': verify_app_id(web_app_id, 'web'),
+            'authDomain': f'{PROJECT_ID}.firebaseapp.com',
+        }
+    else:
+        raise ValueError('Furnizează --web sau --web-app-id pentru aplicația Web.')
+    if web_app_id and platforms['web']['appId'] != verify_app_id(web_app_id, 'web'):
+        raise ValueError('ID-ul Web furnizat nu corespunde configurației Web existente.')
+    native_bytes = [(root / 'android/app/google-services.json', android_source.read_bytes()),
+                    (root / 'ios/Runner/GoogleService-Info.plist', ios_source.read_bytes())]
+    local_path = root / 'firebase/client-config.local.json'
+    defines = json.loads(local_path.read_text(encoding='utf-8')) if local_path.exists() else {'AI_COACH_URL': ''}
+    reject_server_credentials(defines)
+    # Only the known public fields below enter generated source; unrelated
+    # local variables or provider credentials are never copied into the app.
+    defines.update(FIREBASE_PROJECT_ID=PROJECT_ID, FIREBASE_MESSAGING_SENDER_ID=SENDER_ID,
+                   FIREBASE_AUTH_DOMAIN=platforms['web']['authDomain'],
+                   FIREBASE_STORAGE_BUCKET=platforms['android'].get('storageBucket', ''),
+                   FIREBASE_IOS_BUNDLE_ID=BUNDLE_ID)
+    for platform in ['android', 'ios', 'web']:
+        defines[f'FIREBASE_{platform.upper()}_API_KEY'] = platforms[platform]['apiKey']
+        defines[f'FIREBASE_{platform.upper()}_APP_ID'] = platforms[platform]['appId']
+    writes = native_bytes + [
+        (root / 'firebase/web-config.json', (json.dumps(platforms['web'], indent=2) + '\n').encode()),
+        (root / 'lib/firebase_options.dart', generate_dart(platforms).encode()),
+        (local_path, (json.dumps(defines, indent=2) + '\n').encode()),
+    ]
+    # Parse and validate every input before modifying any destination.
+    for destination, content in writes:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+    return platforms
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--android', type=Path, help='google-services.json public')
+    parser.add_argument('--ios', type=Path, help='GoogleService-Info.plist public')
+    parser.add_argument('--web', type=Path, help='obiectul JSON public Firebase Web')
+    parser.add_argument('--web-app-id', help='ID-ul public Web; cheia de proiect existentă este reutilizată dacă exportul Web lipsește')
+    args = parser.parse_args()
+    try:
+        configure(Path(__file__).resolve().parent.parent, android=args.android, ios=args.ios,
+                  web=args.web, web_app_id=args.web_app_id)
+    except (ValueError, KeyError, TypeError, OSError, json.JSONDecodeError) as error:
+        parser.error(str(error))
+    print('Configurația publică Firebase inclusă, fișierele native și configurația locală au fost actualizate.')
+
+
+if __name__ == '__main__':
+    main()

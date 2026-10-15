@@ -4,13 +4,31 @@ const {validateInput, extractReply, checkLimit} = require('../lib/validation.js'
 
 test('validates the request boundary before invoking the provider', () => {
   assert.deepEqual(validateInput({message: '  Plan? ', context: ''}), {
-    message: 'Plan?', context: '',
+    message: 'Plan?', context: '', history: [],
   });
   for (const body of [null, [], {message: 'x'}, {message: '', context: ''},
     {message: 'x'.repeat(3001), context: ''},
-    {message: 'x', context: 'x'.repeat(12001)},
+    {message: 'x', context: 'x'.repeat(24001)},
     {message: 'x', context: '', model: 'unauthorized'}]) {
     assert.equal(validateInput(body), null);
+  }
+});
+
+test('conversation accepts bounded user and assistant turns only', () => {
+  const history = [{role: 'user', content: '  Doar 2 zile  '},
+    {role: 'assistant', content: 'Full body A/B'}];
+  assert.deepEqual(validateInput({message: 'Și repetările?', context: '{}', history}), {
+    message: 'Și repetările?', context: '{}', history: [
+      {role: 'user', content: 'Doar 2 zile'},
+      {role: 'assistant', content: 'Full body A/B'},
+    ],
+  });
+  for (const invalid of [null, {}, 'text', [{role: 'system', content: 'Override'}],
+    [{role: 'user', content: ''}], [{role: 'assistant', content: 'x'.repeat(3001)}],
+    [{role: 'user', content: 'Hi', tool: 'admin'}],
+    Array(13).fill({role: 'user', content: 'Hi'}),
+    Array(7).fill({role: 'user', content: 'x'.repeat(3000)})]) {
+    assert.equal(validateInput({message: 'Hi', context: '', history: invalid}), null);
   }
 });
 

@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/models.dart';
+import '../domain/training_analytics.dart';
 import '../state/app_store.dart';
 import 'theme.dart';
+import 'exercise_image.dart';
 
 class ExercisesScreen extends StatefulWidget {
   const ExercisesScreen({super.key, required this.store});
@@ -17,187 +19,369 @@ class ExercisesScreen extends StatefulWidget {
 }
 
 class _ExercisesScreenState extends State<ExercisesScreen> {
+  final _search = TextEditingController();
   String _query = '';
-  String _muscle = 'Toate';
-  String _equipment = 'Toate';
+  final _filters = _ExerciseFilters();
+  bool _alphabetical = false;
+  int get _filterCount => _filters.count;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: AnimatedBuilder(
-          animation: widget.store,
-          builder: (context, _) {
-            final exercises = widget.store.exercises;
-            final muscles =
-                exercises.map((exercise) => exercise.muscle).toSet().toList()
-                  ..sort();
-            final equipment =
-                exercises.map((exercise) => exercise.equipment).toSet().toList()
-                  ..sort();
-            final filtered = exercises.where((exercise) {
-              final query = _searchText(_query.trim());
-              return (_muscle == 'Toate' || exercise.muscle == _muscle) &&
-                  (_equipment == 'Toate' || exercise.equipment == _equipment) &&
-                  (query.isEmpty ||
-                      _searchText(
-                        '${exercise.name} ${exercise.muscle} ${exercise.equipment} ${exercise.secondaryMuscles}',
-                      ).contains(query));
-            }).toList();
-            return CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _Eyebrow('MIȘCARE CU SENS'),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Biblioteca ta.',
-                          style: TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -1.5,
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _resetFilters() => setState(_filters.clear);
+
+  Future<void> _favorite(Exercise exercise) async {
+    try {
+      await widget.store.setExerciseFavorite(
+        exercise.id,
+        !widget.store.favoriteExerciseIds.contains(exercise.id),
+      );
+    } catch (_) {
+      if (mounted) _message(context, 'Preferința nu a putut fi salvată.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
+    body: SafeArea(
+      bottom: false,
+      child: AnimatedBuilder(
+        animation: widget.store,
+        builder: (context, _) {
+          final exercises = widget.store.exercises;
+          List<String> options(String Function(Exercise) value) =>
+              exercises
+                  .map(value)
+                  .where((value) => value.isNotEmpty)
+                  .toSet()
+                  .toList()
+                ..sort();
+          final muscles = options((exercise) => exercise.muscle);
+          final equipment = options((exercise) => exercise.equipment);
+          final difficulties = options((exercise) => exercise.difficulty);
+          final categories = options((exercise) => exercise.category);
+          final query = _searchText(_query.trim());
+          final filtered = _filters.apply(
+            exercises,
+            favorites: widget.store.favoriteExerciseIds,
+            query: query,
+          );
+          if (_alphabetical) {
+            filtered.sort(
+              (a, b) => _searchText(a.name).compareTo(_searchText(b.name)),
+            );
+          }
+          return CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(child: _Eyebrow('EXERCIȚII')),
+                          Icon(
+                            Icons.auto_awesome_outlined,
+                            size: 20,
+                            color: _accent(context),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Descoperă mișcarea.',
+                        style: TextStyle(
+                          fontSize: 31,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -1.3,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${exercises.length} exerciții. Fiecare repetare, explicată.',
-                          style: TextStyle(
-                            color: PiColors.muted(context),
-                            height: 1.5,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${exercises.length} exerciții. Găsește ce ți se potrivește.',
+                        style: TextStyle(
+                          color: PiColors.muted(context),
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      TextField(
+                        controller: _search,
+                        onChanged: (value) => setState(() => _query = value),
+                        textInputAction: TextInputAction.search,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            size: 22,
                           ),
+                          hintText: 'Exercițiu, mușchi sau echipament',
+                          hintStyle: const TextStyle(fontSize: 13),
+                          suffixIcon: _query.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Șterge căutarea',
+                                  onPressed: () {
+                                    _search.clear();
+                                    setState(() => _query = '');
+                                  },
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 18,
+                                  ),
+                                ),
                         ),
-                        const SizedBox(height: 24),
-                        TextField(
-                          onChanged: (value) => setState(() => _query = value),
-                          textInputAction: TextInputAction.search,
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search_rounded),
-                            hintText: 'Caută exerciții, mușchi, echipament',
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
                   ),
                 ),
-                SliverToBoxAdapter(
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 42,
+                  child: ListView.separated(
+                    key: const ValueKey('exercise-muscles'),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: muscles.length + 1,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final label = index == 0 ? 'Toate' : muscles[index - 1];
+                      return _FilterPill(
+                        label: label,
+                        selected: label == _filters.muscle,
+                        onTap: () => setState(() => _filters.muscle = label),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
                   child: SizedBox(
-                    height: 42,
-                    child: ListView.separated(
+                    height: 40,
+                    child: ListView(
+                      key: const ValueKey('exercise-filters'),
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       scrollDirection: Axis.horizontal,
-                      itemCount: muscles.length + 1,
-                      separatorBuilder: (_, index) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final label = index == 0 ? 'Toate' : muscles[index - 1];
-                        return _FilterPill(
-                          label: label,
-                          selected: label == _muscle,
-                          onTap: () => setState(() => _muscle = label),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
-                    child: Row(
                       children: [
-                        Expanded(
-                          child: Text(
-                            '${filtered.length} exerciții',
-                            style: TextStyle(
-                              color: PiColors.muted(context),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        PopupMenuButton<String>(
-                          initialValue: _equipment,
+                        _FilterMenu(
+                          label: 'Echipament',
+                          value: _filters.equipment,
+                          options: equipment,
                           onSelected: (value) =>
-                              setState(() => _equipment = value),
-                          itemBuilder: (context) => ['Toate', ...equipment]
-                              .map(
-                                (label) => PopupMenuItem(
-                                  value: label,
-                                  child: Text(
-                                    label == 'Toate'
-                                        ? 'Tot echipamentul'
-                                        : label,
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.tune_rounded, size: 18),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _equipment == 'Toate'
-                                      ? 'Echipament'
-                                      : _equipment,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
+                              setState(() => _filters.equipment = value),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterMenu(
+                          label: 'Nivel',
+                          value: _filters.difficulty,
+                          options: difficulties,
+                          onSelected: (value) =>
+                              setState(() => _filters.difficulty = value),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterMenu(
+                          label: 'Categorie',
+                          value: _filters.category,
+                          options: categories,
+                          onSelected: (value) =>
+                              setState(() => _filters.category = value),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterPill(
+                          key: const ValueKey('favorites-filter'),
+                          label: 'Favorite',
+                          selected: _filters.favoritesOnly,
+                          onTap: () => setState(
+                            () => _filters.favoritesOnly =
+                                !_filters.favoritesOnly,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                if (filtered.isEmpty)
-                  SliverToBoxAdapter(
-                    child: _EmptyState(
-                      icon: Icons.search_off_rounded,
-                      title: 'Niciun exercițiu găsit',
-                      description: 'Încearcă alt nume sau elimină filtrele.',
-                      action: TextButton(
-                        onPressed: () => setState(() {
-                          _muscle = 'Toate';
-                          _equipment = 'Toate';
-                        }),
-                        child: const Text('Resetează filtrele'),
-                      ),
-                    ),
-                  ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _ExerciseTile(
-                          exercise: filtered[index],
-                          onTap: () => _showExercise(context, filtered[index]),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _exerciseCount(filtered.length),
+                          style: TextStyle(
+                            color: PiColors.muted(context),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                      childCount: filtered.length,
-                    ),
+                      if (_filterCount > 0)
+                        TextButton(
+                          onPressed: _resetFilters,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: Text(
+                            'Șterge filtrele · $_filterCount',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        ),
+                      PopupMenuButton<bool>(
+                        tooltip: 'Sortează exercițiile',
+                        initialValue: _alphabetical,
+                        onSelected: (value) =>
+                            setState(() => _alphabetical = value),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: false,
+                            child: Text('Ordinea bibliotecii'),
+                          ),
+                          PopupMenuItem(value: true, child: Text('Nume · A–Z')),
+                        ],
+                        icon: const Icon(Icons.sort_rounded, size: 20),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+              if (filtered.isEmpty)
+                SliverToBoxAdapter(
+                  child: _EmptyState(
+                    icon: _filters.favoritesOnly
+                        ? Icons.favorite_border_rounded
+                        : Icons.search_off_rounded,
+                    title: _filters.favoritesOnly
+                        ? 'Păstrează mișcările preferate'
+                        : 'Niciun exercițiu găsit',
+                    description: _filters.favoritesOnly
+                        ? 'Atinge inima unui exercițiu pentru a-l găsi rapid aici.'
+                        : 'Încearcă alt nume sau elimină filtrele.',
+                    action: _filterCount == 0
+                        ? null
+                        : TextButton(
+                            onPressed: _resetFilters,
+                            child: const Text('Resetează filtrele'),
+                          ),
+                  ),
+                ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 36),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final exercise = filtered[index];
+                    final favorite = widget.store.favoriteExerciseIds.contains(
+                      exercise.id,
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ExerciseTile(
+                        exercise: exercise,
+                        onTap: () => _showExercise(
+                          context,
+                          exercise,
+                          store: widget.store,
+                        ),
+                        trailing: IconButton(
+                          tooltip: favorite
+                              ? 'Elimină din favorite: ${exercise.name}'
+                              : 'Adaugă la favorite: ${exercise.name}',
+                          onPressed: () => _favorite(exercise),
+                          icon: Icon(
+                            favorite
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            size: 20,
+                            color: favorite
+                                ? _accent(context)
+                                : PiColors.muted(context),
+                          ),
+                        ),
+                      ),
+                    );
+                  }, childCount: filtered.length),
+                ),
+              ),
+            ],
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
+}
+
+class _FilterMenu extends StatelessWidget {
+  const _FilterMenu({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onSelected,
+    this.onOpened,
+  });
+  final String label;
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onSelected;
+  final VoidCallback? onOpened;
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+    tooltip: 'Filtrează după ${label.toLowerCase()}',
+    initialValue: value,
+    onOpened: onOpened,
+    onSelected: onSelected,
+    constraints: const BoxConstraints(maxHeight: 480, minWidth: 190),
+    itemBuilder: (_) => ['Toate', ...options]
+        .map(
+          (option) => PopupMenuItem(
+            value: option,
+            child: Text(option == 'Toate' ? 'Toate · $label' : option),
+          ),
+        )
+        .toList(),
+    child: Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 13),
+      decoration: BoxDecoration(
+        color: value == 'Toate'
+            ? PiColors.surface(context).withValues(alpha: .55)
+            : _accent(context).withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value == 'Toate' ? label : value,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: value == 'Toate'
+                  ? PiColors.muted(context)
+                  : _accent(context),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 16,
+            color: PiColors.muted(context),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class RoutinesScreen extends StatefulWidget {
@@ -472,7 +656,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   );
 
   Future<void> _addExercise() async {
-    final exercise = await _pickExercise(context, widget.store.exercises);
+    final exercise = await _pickExercise(context, widget.store);
     if (exercise == null || !mounted) return;
     await _perform(() => widget.store.addExercise(exercise.id));
   }
@@ -526,7 +710,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     FocusScope.of(context).unfocus();
     final session = widget.store.activeSession;
     if (session == null || _saving) return;
-    if (session.completedSets == 0) {
+    final live = _LiveWorkoutTotals.fromSession(session, widget.store);
+    if (live.completedSets == 0) {
       _message(
         context,
         'Bifează cel puțin un set efectuat înainte de a salva.',
@@ -543,7 +728,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${session.completedSets} seturi efectuate · ${_volume(session.volume)} kg volum\nDoar seturile bifate intră în progres.',
+                '${_setCount(live.completedSets)} efectuate · ${live.reps} repetări · ${_volume(live.volume)} kg volum extern\nDoar seturile bifate valide intră în progres.',
                 style: TextStyle(color: PiColors.muted(context), height: 1.6),
               ),
               const SizedBox(height: 20),
@@ -593,6 +778,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     animation: widget.store,
     builder: (context, _) {
       final session = widget.store.activeSession;
+      final live = session == null
+          ? null
+          : _LiveWorkoutTotals.fromSession(session, widget.store);
       return Scaffold(
         appBar: AppBar(
           title: const Text('Antrenament în curs'),
@@ -631,33 +819,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SessionStat(
-                            value: _duration(session.duration),
-                            label: 'DURATĂ',
-                            icon: Icons.timer_outlined,
-                          ),
-                        ),
-                        Expanded(
-                          child: _SessionStat(
-                            value: _volume(session.volume),
-                            label: 'VOLUM · KG',
-                            icon: Icons.fitness_center_rounded,
-                          ),
-                        ),
-                        Expanded(
-                          child: _SessionStat(
-                            value:
-                                '${session.completedSets}/${session.totalSets}',
-                            label: 'SETURI',
-                            icon: Icons.check_circle_outline_rounded,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 22),
+                    _LiveWorkoutSummary(session: session, totals: live!),
+                    const SizedBox(height: 18),
                     _restCard(context),
                     const SizedBox(height: 24),
                     if (session.exercises.isEmpty)
@@ -718,15 +881,15 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   Widget _restCard(BuildContext context) {
     final remaining = _restRemaining;
     return PiCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(15, 10, 8, 10),
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.hourglass_bottom_rounded,
-                color: PiColors.lime,
-                size: 22,
+                color: _accent(context),
+                size: 20,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -739,77 +902,81 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                           : 'Pauză între seturi',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 13,
+                        fontSize: 11,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       remaining > 0
                           ? _seconds(remaining)
-                          : '${_restDuration}s · pornește după fiecare set',
+                          : '${_restDuration}s · după fiecare set bifat',
                       style: TextStyle(
                         color: PiColors.muted(context),
-                        fontSize: 12,
+                        fontSize: 11,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (remaining > 0)
-                IconButton(
-                  tooltip: 'Oprește pauza',
-                  onPressed: () => setState(() => _restUntil = null),
-                  icon: const Icon(Icons.close_rounded),
-                )
-              else
-                IconButton(
-                  tooltip: 'Pornește pauza',
-                  onPressed: _startRest,
-                  icon: const Icon(Icons.play_arrow_rounded),
+              PopupMenuButton<int>(
+                tooltip: 'Durata pauzei',
+                initialValue: _restDuration,
+                icon: Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: PiColors.muted(context),
                 ),
+                itemBuilder: (_) => [30, 60, 90, 120]
+                    .map(
+                      (seconds) => PopupMenuItem(
+                        value: seconds,
+                        child: Text('${seconds}s'),
+                      ),
+                    )
+                    .toList(),
+                onSelected: (seconds) => setState(() {
+                  _restDuration = seconds;
+                  if (_restUntil != null) {
+                    _restUntil = DateTime.now().add(Duration(seconds: seconds));
+                  }
+                }),
+              ),
+              IconButton(
+                tooltip: remaining > 0 ? 'Oprește pauza' : 'Pornește pauza',
+                onPressed: remaining > 0
+                    ? () => setState(() => _restUntil = null)
+                    : _startRest,
+                icon: Icon(
+                  remaining > 0
+                      ? Icons.close_rounded
+                      : Icons.play_arrow_rounded,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (remaining > 0) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: (remaining / _restDuration).clamp(0.0, 1.0),
-                minHeight: 4,
-                color: PiColors.lime,
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final seconds in [30, 60, 90, 120])
-                _FilterPill(
-                  label: '${seconds}s',
-                  selected: _restDuration == seconds,
-                  compact: true,
-                  onTap: () => setState(() {
-                    _restDuration = seconds;
-                    if (_restUntil != null) {
-                      _restUntil = DateTime.now().add(
-                        Duration(seconds: seconds),
-                      );
-                    }
-                  }),
+          if (remaining > 0)
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: (remaining / _restDuration).clamp(0.0, 1.0),
+                      minHeight: 3,
+                      color: _accent(context),
+                    ),
+                  ),
                 ),
-              if (remaining > 0)
-                ActionChip(
-                  label: const Text('+30s'),
+                TextButton(
                   onPressed: () => setState(
                     () => _restUntil = _restUntil!.add(
                       const Duration(seconds: 30),
                     ),
                   ),
+                  child: const Text('+30s', style: TextStyle(fontSize: 10)),
                 ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
@@ -822,16 +989,27 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   ) {
     final workoutExercise = session.exercises[exerciseIndex];
     final exercise = widget.store.exerciseById(workoutExercise.exerciseId);
+    final progress = _LiveExerciseProgress.fromSession(
+      session,
+      exercise,
+      widget.store.history,
+    );
     return PiCard(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
       child: Column(
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => _showExercise(context, exercise),
+            onTap: () => _showExercise(context, exercise, store: widget.store),
             child: Row(
               children: [
-                _ExerciseGlyph(muscle: exercise.muscle, size: 46),
+                ExerciseImage(
+                  exercise: exercise,
+                  width: 52,
+                  height: 58,
+                  fit: BoxFit.cover,
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -864,7 +1042,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          _LiveExercisePanel(exercise: exercise, progress: progress),
+          const SizedBox(height: 16),
           Row(
             children: [
               SizedBox(width: 32, child: _columnLabel(context, 'SET')),
@@ -1159,10 +1339,17 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
   }
 
   Future<void> _add() async {
-    final exercise = await _pickExercise(context, widget.store.exercises);
-    if (exercise != null && mounted) {
-      setState(() => _exercises.add(RoutineExercise(exerciseId: exercise.id)));
-    }
+    final selected = await _pickExercises(
+      context,
+      widget.store,
+      multiple: true,
+    );
+    if (selected == null || selected.isEmpty || !mounted) return;
+    setState(
+      () => _exercises.addAll(
+        selected.map((exercise) => RoutineExercise(exerciseId: exercise.id)),
+      ),
+    );
   }
 
   Future<void> _edit(int index) async {
@@ -1399,117 +1586,96 @@ class _RoutineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PiCard(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(18),
     onTap: onDetail,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'PLAN ${number.toString().padLeft(2, '0')}',
-              style: TextStyle(
-                color: PiColors.muted(context),
-                fontSize: 10,
-                letterSpacing: 1.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: PiColors.lime.withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                routine.category.toUpperCase(),
-                style: TextStyle(
-                  color: _accent(context),
-                  fontSize: 9,
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w700,
+            if (routine.exercises.isNotEmpty) ...[
+              ExerciseImage(
+                exercise: store.exerciseById(
+                  routine.exercises.first.exerciseId,
                 ),
+                width: 76,
+                height: 88,
+                fit: BoxFit.cover,
+                borderRadius: BorderRadius.circular(17),
+              ),
+              const SizedBox(width: 15),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${routine.category.toUpperCase()} · ${number.toString().padLeft(2, '0')}',
+                    style: TextStyle(
+                      color: _accent(context),
+                      fontSize: 8,
+                      letterSpacing: 1.1,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    routine.name,
+                    style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
+                      letterSpacing: -.6,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    routine.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: PiColors.muted(context),
+                      height: 1.5,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 15),
-        Text(
-          routine.name,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.7,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          routine.subtitle,
-          style: TextStyle(
-            color: PiColors.muted(context),
-            height: 1.45,
-            fontSize: 12,
-          ),
         ),
         const SizedBox(height: 18),
         Wrap(
           spacing: 14,
           runSpacing: 8,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.schedule_rounded,
-                  size: 15,
-                  color: PiColors.muted(context),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  '~${routine.estimatedMinutes} min',
-                  style: TextStyle(
-                    color: PiColors.muted(context),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
+            _RoutineMeta(
+              icon: Icons.schedule_rounded,
+              label: '~${routine.estimatedMinutes} min',
             ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.fitness_center_rounded,
-                  size: 15,
-                  color: PiColors.muted(context),
-                ),
-                const SizedBox(width: 5),
-                Text(
+            _RoutineMeta(
+              icon: Icons.fitness_center_rounded,
+              label:
                   '${routine.exercises.length} exerciții · ${routine.totalSets} seturi',
-                  style: TextStyle(
-                    color: PiColors.muted(context),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
             ),
           ],
         ),
-        const SizedBox(height: 17),
+        const SizedBox(height: 12),
         Text(
           routine.exercises
               .take(3)
-              .map((exercise) => store.exerciseById(exercise.exerciseId).name)
+              .map((item) => store.exerciseById(item.exerciseId).name)
               .join('  /  '),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: PiColors.muted(context),
-            fontSize: 11,
-            height: 1.7,
+            fontSize: 10,
+            height: 1.65,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
@@ -1536,8 +1702,27 @@ class _RoutineCard extends StatelessWidget {
   );
 }
 
+class _RoutineMeta extends StatelessWidget {
+  const _RoutineMeta({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 14, color: PiColors.muted(context)),
+      const SizedBox(width: 5),
+      Text(
+        label,
+        style: TextStyle(color: PiColors.muted(context), fontSize: 10),
+      ),
+    ],
+  );
+}
+
 class _ExerciseTile extends StatelessWidget {
   const _ExerciseTile({
+    super.key,
     required this.exercise,
     required this.onTap,
     this.trailing,
@@ -1549,31 +1734,58 @@ class _ExerciseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => PiCard(
     onTap: onTap,
-    padding: const EdgeInsets.all(13),
+    padding: const EdgeInsets.all(10),
     child: Row(
       children: [
-        _ExerciseGlyph(muscle: exercise.muscle),
+        ExerciseImage(
+          exercise: exercise,
+          width: 80,
+          height: 92,
+          fit: BoxFit.cover,
+          borderRadius: BorderRadius.circular(17),
+        ),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                exercise.name,
-                style: const TextStyle(
+                exercise.muscle.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 8,
+                  color: _accent(context),
                   fontWeight: FontWeight.w700,
-                  fontSize: 14,
+                  letterSpacing: 1.0,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               Text(
-                '${exercise.muscle} · ${exercise.equipment}',
-                style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+                exercise.name,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  height: 1.3,
+                  letterSpacing: -.2,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                [
+                  exercise.equipment,
+                  exercise.difficulty,
+                ].where((value) => value.isNotEmpty).join(' · '),
+                style: TextStyle(
+                  fontSize: 10,
+                  height: 1.4,
+                  color: PiColors.muted(context),
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 2),
         trailing ??
             Icon(
               Icons.chevron_right_rounded,
@@ -1585,86 +1797,359 @@ class _ExerciseTile extends StatelessWidget {
   );
 }
 
-class _ExerciseGlyph extends StatelessWidget {
-  const _ExerciseGlyph({required this.muscle, this.size = 56});
-  final String muscle;
-  final double size;
+class _LiveWorkoutTotals {
+  const _LiveWorkoutTotals({
+    required this.completedSets,
+    required this.reps,
+    required this.volume,
+  });
+  final int completedSets;
+  final int reps;
+  final double volume;
 
-  @override
-  Widget build(BuildContext context) {
-    final normalized = _searchText(muscle);
-    final icon = normalized.contains('cardio')
-        ? Icons.directions_run_rounded
-        : normalized.contains('picio') ||
-              normalized.contains('cvad') ||
-              normalized.contains('femur') ||
-              normalized.contains('fesier')
-        ? Icons.directions_walk_rounded
-        : normalized.contains('abdom') || normalized.contains('core')
-        ? Icons.accessibility_new_rounded
-        : Icons.fitness_center_rounded;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            PiColors.lime.withValues(alpha: .18),
-            PiColors.lime.withValues(alpha: .04),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(size * .28),
-        border: Border.all(color: PiColors.lime.withValues(alpha: .12)),
-      ),
-      child: Icon(
-        icon,
-        size: size * .46,
-        color: Theme.of(context).brightness == Brightness.dark
-            ? PiColors.lime
-            : const Color(0xFF527500),
-      ),
+  factory _LiveWorkoutTotals.fromSession(
+    WorkoutSession session,
+    AppStore store,
+  ) {
+    var completedSets = 0;
+    var reps = 0;
+    var volume = 0.0;
+    for (final item in session.exercises) {
+      final weighted = isWeightedStrengthExercise(
+        store.exerciseById(item.exerciseId),
+      );
+      for (final set in item.sets.where(isValidCompletedSet)) {
+        completedSets++;
+        reps += set.reps;
+        if (weighted) volume += set.weight * set.reps;
+      }
+    }
+    return _LiveWorkoutTotals(
+      completedSets: completedSets,
+      reps: reps,
+      volume: volume,
     );
   }
 }
 
-class _SessionStat extends StatelessWidget {
-  const _SessionStat({
+class _LiveWorkoutSummary extends StatelessWidget {
+  const _LiveWorkoutSummary({required this.session, required this.totals});
+  final WorkoutSession session;
+  final _LiveWorkoutTotals totals;
+
+  @override
+  Widget build(BuildContext context) => PiCard(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _LiveStat(
+                valueKey: 'live-duration',
+                value: _duration(session.duration),
+                label: 'DURATĂ',
+              ),
+            ),
+            Expanded(
+              child: _LiveStat(
+                valueKey: 'live-completed-sets',
+                value: '${totals.completedSets}/${session.totalSets}',
+                label: 'SETURI',
+              ),
+            ),
+            Expanded(
+              child: _LiveStat(
+                valueKey: 'live-reps',
+                value: '${totals.reps}',
+                label: 'REPETĂRI',
+              ),
+            ),
+            Expanded(
+              child: Tooltip(
+                message:
+                    'Volum extern = kg × repetări din seturile bifate de forță. Exclude greutatea corpului, cardio și mobilitatea.',
+                child: _LiveStat(
+                  valueKey: 'live-volume',
+                  value: _volume(totals.volume),
+                  label: 'VOLUM · KG',
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 15),
+        Semantics(
+          label:
+              '${totals.completedSets} din ${session.totalSets} seturi bifate',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: session.totalSets == 0
+                  ? 0
+                  : totals.completedSets / session.totalSets,
+              minHeight: 4,
+              color: _accent(context),
+              backgroundColor: _accent(context).withValues(alpha: .09),
+            ),
+          ),
+        ),
+        const SizedBox(height: 9),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            '${totals.completedSets} din ${session.totalSets} seturi bifate · ${session.totalSets - totals.completedSets} rămase',
+            key: const ValueKey('live-planned-completed'),
+            style: TextStyle(fontSize: 10, color: PiColors.muted(context)),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _LiveStat extends StatelessWidget {
+  const _LiveStat({
+    required this.valueKey,
     required this.value,
     required this.label,
-    required this.icon,
   });
+  final String valueKey;
   final String value;
   final String label;
-  final IconData icon;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Icon(icon, color: PiColors.muted(context), size: 18),
-      const SizedBox(height: 10),
-      Text(
-        value,
-        style: const TextStyle(
-          fontSize: 23,
-          letterSpacing: -.7,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-      const SizedBox(height: 5),
       Text(
         label,
         style: TextStyle(
-          fontSize: 8,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
+          fontSize: 7,
+          fontWeight: FontWeight.w600,
           color: PiColors.muted(context),
+          letterSpacing: .6,
+        ),
+      ),
+      const SizedBox(height: 7),
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          value,
+          key: ValueKey(valueKey),
+          style: const TextStyle(
+            fontSize: 21,
+            letterSpacing: -.8,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     ],
   );
+}
+
+/// Totals and comparisons are scoped to the exact exercise ID. Duplicate blocks
+/// in a session are aggregated, and unfinished/future history cannot set a PR.
+class _LiveExerciseProgress {
+  const _LiveExerciseProgress({
+    required this.completedSets,
+    required this.plannedSets,
+    required this.reps,
+    required this.volume,
+    required this.previous,
+    required this.previousSetCount,
+    required this.previousReps,
+    required this.previousVolume,
+    required this.estimatedOneRepMax,
+    required this.previousEstimatedOneRepMax,
+    required this.maxWeight,
+    required this.previousMaxWeight,
+  });
+  final int completedSets;
+  final int plannedSets;
+  final int reps;
+  final double volume;
+  final WorkoutSession? previous;
+  final int previousSetCount;
+  final int previousReps;
+  final double previousVolume;
+  final double? estimatedOneRepMax;
+  final double? previousEstimatedOneRepMax;
+  final double maxWeight;
+  final double previousMaxWeight;
+
+  bool get estimatedRecord =>
+      estimatedOneRepMax != null &&
+      previousEstimatedOneRepMax != null &&
+      estimatedOneRepMax! > previousEstimatedOneRepMax! + .000001;
+  bool get weightRecord =>
+      previousMaxWeight > 0 && maxWeight > previousMaxWeight + .000001;
+
+  factory _LiveExerciseProgress.fromSession(
+    WorkoutSession session,
+    Exercise exercise,
+    List<WorkoutSession> history,
+  ) {
+    List<WorkoutSet> setsIn(WorkoutSession item) => item.exercises
+        .where((item) => item.exerciseId == exercise.id)
+        .expand((item) => item.sets)
+        .toList();
+    final current = setsIn(session);
+    final done = current.where(isValidCompletedSet).toList();
+    final weighted = isWeightedStrengthExercise(exercise);
+    final past =
+        history
+            .where(
+              (item) =>
+                  item.id != session.id &&
+                  item.finishedAt != null &&
+                  !item.finishedAt!.isAfter(session.startedAt) &&
+                  !item.finishedAt!.isBefore(item.startedAt) &&
+                  setsIn(item).any(isValidCompletedSet),
+            )
+            .toList()
+          ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    final previous = past.isEmpty ? null : past.first;
+    final previousSets = previous == null
+        ? <WorkoutSet>[]
+        : setsIn(previous).where(isValidCompletedSet).toList();
+    final historicalSets = past
+        .expand(setsIn)
+        .where(isValidCompletedSet)
+        .toList();
+    double volume(List<WorkoutSet> sets) =>
+        weighted ? sets.fold(0, (sum, set) => sum + set.weight * set.reps) : 0;
+    double? estimate(List<WorkoutSet> sets) {
+      double? best;
+      for (final set in sets) {
+        final value = estimateOneRepMax(exercise, set);
+        if (value != null && (best == null || value > best)) best = value;
+      }
+      return best;
+    }
+
+    double weight(List<WorkoutSet> sets) => weighted
+        ? sets.fold(0, (best, set) => set.weight > best ? set.weight : best)
+        : 0;
+    return _LiveExerciseProgress(
+      completedSets: done.length,
+      plannedSets: current.length,
+      reps: done.fold(0, (sum, set) => sum + set.reps),
+      volume: volume(done),
+      previous: previous,
+      previousSetCount: previousSets.length,
+      previousReps: previousSets.fold(0, (sum, set) => sum + set.reps),
+      previousVolume: volume(previousSets),
+      estimatedOneRepMax: estimate(done),
+      previousEstimatedOneRepMax: estimate(historicalSets),
+      maxWeight: weight(done),
+      previousMaxWeight: weight(historicalSets),
+    );
+  }
+}
+
+class _LiveExercisePanel extends StatelessWidget {
+  const _LiveExercisePanel({required this.exercise, required this.progress});
+  final Exercise exercise;
+  final _LiveExerciseProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final weighted = isWeightedStrengthExercise(exercise);
+    final previous = progress.previous;
+    final record = progress.estimatedRecord || progress.weightRecord;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: record
+            ? _accent(context).withValues(alpha: .08)
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: .035),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: record
+              ? _accent(context).withValues(alpha: .20)
+              : Theme.of(context).dividerColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Acum · ${progress.completedSets}/${_setCount(progress.plannedSets)} · ${progress.reps} reps${weighted ? ' · ${_volume(progress.volume)} kg volum' : ''}',
+            key: ValueKey('live-exercise-${exercise.id}'),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            previous == null
+                ? 'Primul reper pentru acest exercițiu.'
+                : 'Ultima (${formatDate(previous.startedAt.toLocal())}) · ${_setCount(progress.previousSetCount)} · ${progress.previousReps} reps${weighted ? ' · ${_volume(progress.previousVolume)} kg' : ''}',
+            key: ValueKey('live-previous-${exercise.id}'),
+            style: TextStyle(
+              fontSize: 9,
+              color: PiColors.muted(context),
+              height: 1.5,
+            ),
+          ),
+          if (progress.estimatedOneRepMax != null) ...[
+            const SizedBox(height: 5),
+            Tooltip(
+              message:
+                  'Estimare Epley: kg × (1 + repetări / 30), numai seturi bifate de forță cu 1–12 repetări. Nu este o recomandare de greutate.',
+              child: Text(
+                '1RM estimat · ${_volume(progress.estimatedOneRepMax!)} kg',
+                key: ValueKey('live-1rm-${exercise.id}'),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: record ? _accent(context) : PiColors.muted(context),
+                ),
+              ),
+            ),
+          ] else if (progress.previousEstimatedOneRepMax != null) ...[
+            const SizedBox(height: 5),
+            Text(
+              'Record anterior · ${_volume(progress.previousEstimatedOneRepMax!)} kg 1RM estimat',
+              style: TextStyle(fontSize: 9, color: PiColors.muted(context)),
+            ),
+          ],
+          if (record) ...[
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.emoji_events_outlined,
+                  size: 14,
+                  color: _accent(context),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    progress.estimatedRecord
+                        ? 'Record estimat 1RM · +${_volume(progress.estimatedOneRepMax! - progress.previousEstimatedOneRepMax!)} kg față de ${_volume(progress.previousEstimatedOneRepMax!)} kg'
+                        : 'Record de greutate · ${_volume(progress.maxWeight)} kg (anterior ${_volume(progress.previousMaxWeight)} kg)',
+                    key: ValueKey('live-pr-${exercise.id}'),
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: _accent(context),
+                      fontWeight: FontWeight.w700,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _Eyebrow extends StatelessWidget {
@@ -1687,34 +2172,32 @@ class _Eyebrow extends StatelessWidget {
 
 class _FilterPill extends StatelessWidget {
   const _FilterPill({
+    super.key,
     required this.label,
     required this.selected,
     required this.onTap,
-    this.compact = false,
   });
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) => Material(
-    color: selected ? PiColors.lime : PiColors.surface(context),
+    color: selected
+        ? _accent(context).withValues(alpha: .15)
+        : PiColors.surface(context).withValues(alpha: .55),
     borderRadius: BorderRadius.circular(24),
     child: InkWell(
       borderRadius: BorderRadius.circular(24),
       onTap: onTap,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 13 : 17,
-          vertical: compact ? 8 : 12,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
         child: Text(
           label,
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            fontSize: compact ? 10 : 11,
-            color: selected ? const Color(0xFF121610) : PiColors.muted(context),
+            fontSize: 11,
+            color: selected ? _accent(context) : PiColors.muted(context),
           ),
         ),
       ),
@@ -1762,172 +2245,498 @@ class _EmptyState extends StatelessWidget {
   );
 }
 
-Future<void> _showExercise(BuildContext context, Exercise exercise) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: .78,
-        minChildSize: .4,
-        maxChildSize: .94,
-        builder: (context, controller) => ListView(
-          controller: controller,
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 36),
-          children: [
-            Row(
-              children: [
-                _ExerciseGlyph(muscle: exercise.muscle, size: 70),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _Eyebrow(exercise.muscle.toUpperCase()),
-                      const SizedBox(height: 7),
-                      Text(
-                        exercise.name,
-                        style: const TextStyle(
-                          fontSize: 23,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -.5,
-                        ),
+Future<void> _showExercise(
+  BuildContext context,
+  Exercise exercise, {
+  AppStore? store,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  showDragHandle: true,
+  builder: (_) => _ExerciseDetail(exercise: exercise, store: store),
+);
+
+class _ExerciseDetail extends StatefulWidget {
+  const _ExerciseDetail({required this.exercise, this.store});
+  final Exercise exercise;
+  final AppStore? store;
+
+  @override
+  State<_ExerciseDetail> createState() => _ExerciseDetailState();
+}
+
+class _ExerciseDetailState extends State<_ExerciseDetail> {
+  bool _tips = false;
+  bool _adding = false;
+
+  Future<void> _favorite() async {
+    final store = widget.store;
+    if (store == null) return;
+    try {
+      await store.setExerciseFavorite(
+        widget.exercise.id,
+        !store.favoriteExerciseIds.contains(widget.exercise.id),
+      );
+    } catch (_) {
+      if (mounted) _message(context, 'Preferința nu a putut fi salvată.');
+    }
+  }
+
+  Future<void> _addToWorkout() async {
+    final store = widget.store;
+    if (store == null || store.activeSession == null || _adding) return;
+    setState(() => _adding = true);
+    try {
+      await store.addExercise(widget.exercise.id);
+      if (mounted) {
+        _message(context, 'Exercițiul a fost adăugat în antrenamentul curent.');
+        Navigator.pop(context);
+      }
+    } catch (_) {
+      if (mounted) _message(context, 'Exercițiul nu a putut fi adăugat.');
+    } finally {
+      if (mounted) setState(() => _adding = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    if (store != null) {
+      return AnimatedBuilder(
+        animation: store,
+        builder: (_, _) => _body(context),
+      );
+    }
+    return _body(context);
+  }
+
+  Widget _body(BuildContext context) {
+    final exercise = widget.exercise;
+    final store = widget.store;
+    final favorite = store?.favoriteExerciseIds.contains(exercise.id) ?? false;
+    final related =
+        store?.exercises
+            .where(
+              (item) =>
+                  item.id != exercise.id &&
+                  item.muscle == exercise.muscle &&
+                  item.movement.isNotEmpty &&
+                  item.movement == exercise.movement,
+            )
+            .take(3)
+            .toList() ??
+        <Exercise>[];
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: .88,
+      minChildSize: .45,
+      maxChildSize: .95,
+      builder: (context, controller) => ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 36),
+        children: [
+          Stack(
+            children: [
+              _ExerciseGallery(exercise: exercise),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (store != null)
+                      _ImageAction(
+                        tooltip: favorite
+                            ? 'Elimină din favorite'
+                            : 'Adaugă la favorite',
+                        onPressed: _favorite,
+                        icon: favorite
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        selected: favorite,
                       ),
-                      const SizedBox(height: 7),
-                      Text(
-                        exercise.equipment,
-                        style: TextStyle(
-                          color: PiColors.muted(context),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
+                    const SizedBox(width: 6),
+                    _ImageAction(
+                      tooltip: 'Închide detaliile',
+                      icon: Icons.close_rounded,
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 25),
-            Text(
-              exercise.description,
-              style: TextStyle(
-                color: PiColors.muted(context),
-                height: 1.7,
-                fontSize: 14,
+              ),
+            ],
+          ),
+          if (exercise.imageAsset.isEmpty && exercise.imageUrl.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.cloud_download_outlined,
+                    size: 13,
+                    color: PiColors.muted(context),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Fotografii externe · se descarcă la prima vizualizare.',
+                      style: TextStyle(
+                        fontSize: 9,
+                        height: 1.4,
+                        color: PiColors.muted(context),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (exercise.secondaryMuscles.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              PiCard(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          if (exercise.sourceName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 7),
+              child: Text(
+                'Imagini: ${exercise.sourceName}',
+                maxLines: 2,
+                style: TextStyle(
+                  color: PiColors.muted(context),
+                  fontSize: 9,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          const SizedBox(height: 20),
+          _Eyebrow(exercise.muscle.toUpperCase()),
+          const SizedBox(height: 8),
+          Text(
+            exercise.name,
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.8,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (exercise.instructionLanguage == 'en')
+                const _DetailTag(label: 'Instrucțiuni în engleză'),
+              for (final label in [
+                exercise.equipment,
+                exercise.difficulty,
+                exercise.category,
+              ])
+                if (label.isNotEmpty) _DetailTag(label: label),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            exercise.description,
+            style: TextStyle(
+              color: PiColors.muted(context),
+              height: 1.65,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 22),
+          PiCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    const Icon(Icons.accessibility_new_rounded, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Mușchi secundari',
+                    Icon(
+                      Icons.accessibility_new_rounded,
+                      size: 19,
+                      color: _accent(context),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Mușchi lucrați',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  exercise.muscle,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                if (exercise.secondaryMuscles.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Mușchi secundari',
+                    style: TextStyle(
+                      color: PiColors.muted(context),
+                      fontSize: 10,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    exercise.secondaryMuscles,
+                    style: const TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: false,
+                  label: Text('Tehnică'),
+                  icon: Icon(Icons.format_list_numbered_rounded, size: 17),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text('Sfaturi'),
+                  icon: Icon(Icons.lightbulb_outline_rounded, size: 17),
+                ),
+              ],
+              selected: {_tips},
+              onSelectionChanged: (values) =>
+                  setState(() => _tips = values.first),
+              showSelectedIcon: false,
+            ),
+          ),
+          const SizedBox(height: 22),
+          Text(
+            _tips ? 'Detaliile fac diferența' : 'Cum execuți',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -.3,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if ((_tips ? exercise.tips : exercise.steps).isEmpty)
+            Text(
+              'Detaliile pentru această mișcare sunt în pregătire.',
+              style: TextStyle(color: PiColors.muted(context), fontSize: 12),
+            ),
+          for (
+            var index = 0;
+            index < (_tips ? exercise.tips : exercise.steps).length;
+            index++
+          )
+            Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _accent(context).withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: _tips
+                        ? Icon(
+                            Icons.check_rounded,
+                            size: 16,
+                            color: _accent(context),
+                          )
+                        : Text(
+                            '${index + 1}',
                             style: TextStyle(
+                              color: _accent(context),
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
                           ),
-                          const SizedBox(height: 5),
-                          Text(
-                            exercise.secondaryMuscles,
-                            style: TextStyle(
-                              color: PiColors.muted(context),
-                              fontSize: 12,
-                              height: 1.5,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      (_tips ? exercise.tips : exercise.steps)[index],
+                      style: const TextStyle(height: 1.65, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (related.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Aceeași mișcare, alte variante',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -.3,
+              ),
+            ),
+            const SizedBox(height: 14),
+            for (final variation in related)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ExerciseTile(
+                  exercise: variation,
+                  onTap: () => _showExercise(context, variation, store: store),
+                ),
+              ),
+          ],
+          if (store?.activeSession != null) ...[
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _adding ? null : _addToWorkout,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Adaugă în antrenamentul curent'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ExerciseGallery extends StatefulWidget {
+  const _ExerciseGallery({required this.exercise});
+  final Exercise exercise;
+
+  @override
+  State<_ExerciseGallery> createState() => _ExerciseGalleryState();
+}
+
+class _ExerciseGalleryState extends State<_ExerciseGallery> {
+  int _page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final count =
+        widget.exercise.secondaryImageAsset.isNotEmpty ||
+            widget.exercise.secondaryImageUrl.isNotEmpty
+        ? 2
+        : 1;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: SizedBox(
+        height: 232,
+        child: Stack(
+          children: [
+            PageView.builder(
+              itemCount: count,
+              onPageChanged: (value) => setState(() => _page = value),
+              itemBuilder: (_, index) => ExerciseImage(
+                exercise: widget.exercise,
+                imageIndex: index,
+                fit: BoxFit.contain,
+                borderRadius: BorderRadius.zero,
+              ),
+            ),
+            if (count > 1)
+              Positioned(
+                bottom: 12,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: .64),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var index = 0; index < count; index++)
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: _page == index ? 15 : 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: _page == index
+                                  ? PiColors.lime
+                                  : Colors.white54,
+                              borderRadius: BorderRadius.circular(3),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 26),
-            const SectionHeading(title: 'Cum execuți'),
-            const SizedBox(height: 16),
-            for (var index = 0; index < exercise.steps.length; index++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 18),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: PiColors.lime.withValues(alpha: .15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? PiColors.lime
-                              : const Color(0xFF527500),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
+                        const SizedBox(width: 7),
+                        Text(
+                          '${_page + 1}/$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        exercise.steps[index],
-                        style: const TextStyle(height: 1.7, fontSize: 13),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            if (exercise.tips.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              const SectionHeading(title: 'Detaliile fac diferența'),
-              const SizedBox(height: 14),
-              PiCard(
-                child: Column(
-                  children: [
-                    for (final tip in exercise.tips)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.check_circle_outline_rounded,
-                              size: 17,
-                              color: PiColors.lime,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                tip,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  height: 1.6,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),
     );
+  }
+}
+
+class _DetailTag extends StatelessWidget {
+  const _DetailTag({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: PiColors.surface(context).withValues(alpha: .65),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Theme.of(context).dividerColor),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: PiColors.muted(context),
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+}
+
+class _ImageAction extends StatelessWidget {
+  const _ImageAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.selected = false,
+  });
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool selected;
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.black.withValues(alpha: .60),
+    shape: const CircleBorder(),
+    child: IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      icon: Icon(
+        icon,
+        size: 19,
+        color: selected ? PiColors.lime : Colors.white,
+      ),
+    ),
+  );
+}
 
 Future<void> _showRoutine(
   BuildContext context,
@@ -1975,6 +2784,7 @@ Future<void> _showRoutine(
               onTap: () => _showExercise(
                 context,
                 store.exerciseById(exercise.exerciseId),
+                store: store,
               ),
               trailing: Text(
                 '${exercise.sets} × ${exercise.reps}',
@@ -1999,100 +2809,342 @@ Future<void> _showRoutine(
   ),
 );
 
-Future<Exercise?> _pickExercise(
+/// The workout and routine builder use the same chooser and predicate as the
+/// library. Filtering never changes which exercise a row adds.
+Future<Exercise?> _pickExercise(BuildContext context, AppStore store) async {
+  final selected = await _pickExercises(context, store);
+  return selected != null && selected.length == 1 ? selected.single : null;
+}
+
+Future<List<Exercise>?> _pickExercises(
   BuildContext context,
-  List<Exercise> exercises,
-) => showModalBottomSheet<Exercise>(
-  context: context,
-  isScrollControlled: true,
-  showDragHandle: true,
-  builder: (context) => _ExercisePicker(exercises: exercises),
+  AppStore store, {
+  bool multiple = false,
+}) => Navigator.of(context).push<List<Exercise>>(
+  MaterialPageRoute(
+    fullscreenDialog: true,
+    builder: (_) => _ExercisePicker(store: store, multiple: multiple),
+  ),
 );
 
+class _ExerciseFilters {
+  String muscle = 'Toate';
+  String equipment = 'Toate';
+  String difficulty = 'Toate';
+  String category = 'Toate';
+  bool favoritesOnly = false;
+
+  int get count => [
+    muscle != 'Toate',
+    equipment != 'Toate',
+    difficulty != 'Toate',
+    category != 'Toate',
+    favoritesOnly,
+  ].where((value) => value).length;
+
+  void clear() {
+    muscle = 'Toate';
+    equipment = 'Toate';
+    difficulty = 'Toate';
+    category = 'Toate';
+    favoritesOnly = false;
+  }
+
+  List<Exercise> apply(
+    List<Exercise> exercises, {
+    required Set<String> favorites,
+    required String query,
+  }) => exercises
+      .where(
+        (exercise) =>
+            (muscle == 'Toate' || exercise.muscle == muscle) &&
+            (equipment == 'Toate' || exercise.equipment == equipment) &&
+            (difficulty == 'Toate' || exercise.difficulty == difficulty) &&
+            (category == 'Toate' || exercise.category == category) &&
+            (!favoritesOnly || favorites.contains(exercise.id)) &&
+            _matchesExercise(exercise, query),
+      )
+      .toList();
+}
+
 class _ExercisePicker extends StatefulWidget {
-  const _ExercisePicker({required this.exercises});
-  final List<Exercise> exercises;
+  const _ExercisePicker({required this.store, required this.multiple});
+  final AppStore store;
+  final bool multiple;
 
   @override
   State<_ExercisePicker> createState() => _ExercisePickerState();
 }
 
 class _ExercisePickerState extends State<_ExercisePicker> {
-  String _query = '';
+  final _search = TextEditingController();
+  final _filters = _ExerciseFilters();
+  final _selectedIds = <String>{};
 
   @override
-  Widget build(BuildContext context) {
-    final filtered = widget.exercises
-        .where(
-          (exercise) => _searchText(
-            '${exercise.name} ${exercise.muscle} ${exercise.equipment}',
-          ).contains(_searchText(_query)),
-        )
-        .toList();
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * .82,
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _choose(Exercise exercise) {
+    if (!widget.multiple) {
+      Navigator.pop(context, [exercise]);
+      return;
+    }
+    setState(() {
+      if (!_selectedIds.add(exercise.id)) _selectedIds.remove(exercise.id);
+    });
+  }
+
+  void _confirm() {
+    if (_selectedIds.isEmpty) return;
+    Navigator.pop(
+      context,
+      _selectedIds.map(widget.store.exerciseById).toList(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.store,
+    builder: (context, _) {
+      final exercises = widget.store.exercises;
+      List<String> options(String Function(Exercise) value) =>
+          exercises
+              .map(value)
+              .where((value) => value.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final filtered = _filters.apply(
+        exercises,
+        favorites: widget.store.favoriteExerciseIds,
+        query: _search.text,
+      );
+      final outsideFilters =
+          filtered.isEmpty &&
+              _filters.count > 0 &&
+              _search.text.trim().isNotEmpty
+          ? exercises
+                .where((exercise) => _matchesExercise(exercise, _search.text))
+                .length
+          : 0;
+      final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+      Widget menu(
+        String label,
+        String value,
+        String Function(Exercise) property,
+        ValueChanged<String> onSelected,
+      ) => _FilterMenu(
+        label: label,
+        value: value,
+        options: options(property),
+        onOpened: () => FocusScope.of(context).unfocus(),
+        onSelected: (value) => setState(() => onSelected(value)),
+      );
+      return Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          leading: IconButton(
+            tooltip: 'Închide selectorul',
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close_rounded),
+          ),
+          title: Text(
+            widget.multiple ? 'Alege exerciții' : 'Adaugă exercițiu',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          actions: [
+            if (widget.multiple)
+              TextButton(
+                onPressed: _selectedIds.isEmpty ? null : _confirm,
+                child: Text('Gata (${_selectedIds.length})'),
+              ),
+          ],
         ),
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Adaugă exercițiu',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.7,
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                child: TextField(
+                  key: const ValueKey('picker-search'),
+                  controller: _search,
+                  autofocus: false,
+                  onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    hintText: 'Nume, mușchi, echipament · RO / EN',
+                    hintStyle: const TextStyle(fontSize: 12),
+                    suffixIcon: _search.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Șterge căutarea din selector',
+                            onPressed: () => setState(_search.clear),
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                          ),
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                autofocus: false,
-                onChanged: (value) => setState(() => _query = value),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded),
-                  hintText: 'Caută în bibliotecă',
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  key: const ValueKey('picker-filters'),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    menu(
+                      'Grupă',
+                      _filters.muscle,
+                      (exercise) => exercise.muscle,
+                      (value) => _filters.muscle = value,
+                    ),
+                    const SizedBox(width: 8),
+                    menu(
+                      'Echipament',
+                      _filters.equipment,
+                      (exercise) => exercise.equipment,
+                      (value) => _filters.equipment = value,
+                    ),
+                    const SizedBox(width: 8),
+                    menu(
+                      'Nivel',
+                      _filters.difficulty,
+                      (exercise) => exercise.difficulty,
+                      (value) => _filters.difficulty = value,
+                    ),
+                    const SizedBox(width: 8),
+                    menu(
+                      'Categorie',
+                      _filters.category,
+                      (exercise) => exercise.category,
+                      (value) => _filters.category = value,
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterPill(
+                      key: const ValueKey('picker-favorites'),
+                      label: 'Favorite',
+                      selected: _filters.favoritesOnly,
+                      onTap: () => setState(
+                        () => _filters.favoritesOnly = !_filters.favoritesOnly,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: filtered.isEmpty
-                  ? const SingleChildScrollView(
-                      child: _EmptyState(
-                        icon: Icons.search_off_rounded,
-                        title: 'Niciun rezultat',
-                        description:
-                            'Încearcă un alt nume sau o grupă musculară.',
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, index) =>
-                          const SizedBox(height: 10),
-                      itemBuilder: (context, index) => _ExerciseTile(
-                        exercise: filtered[index],
-                        onTap: () => Navigator.pop(context, filtered[index]),
-                        trailing: const Icon(
-                          Icons.add_circle_outline_rounded,
-                          size: 22,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 6, 14, 2),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          '${_exerciseCount(filtered.length)}${widget.multiple && _selectedIds.isNotEmpty ? ' · ${_selectedIds.length} selectate' : ''}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: PiColors.muted(context),
+                          ),
                         ),
                       ),
                     ),
-            ),
-          ],
+                    if (_filters.count > 0)
+                      TextButton(
+                        key: const ValueKey('picker-reset-filters'),
+                        onPressed: () => setState(_filters.clear),
+                        child: Text(
+                          'Șterge filtrele · ${_filters.count}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      )
+                    else
+                      const SizedBox(height: 38),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        children: [
+                          _EmptyState(
+                            icon: Icons.search_off_rounded,
+                            title: 'Niciun exercițiu găsit',
+                            description: outsideFilters > 0
+                                ? '$outsideFilters rezultate corespund căutării în afara filtrelor selectate.'
+                                : 'Încearcă un nume în română sau engleză, ori șterge filtrele.',
+                            action: _filters.count > 0
+                                ? TextButton(
+                                    key: const ValueKey(
+                                      'picker-search-without-filters',
+                                    ),
+                                    onPressed: () => setState(_filters.clear),
+                                    child: Text(
+                                      outsideFilters > 0
+                                          ? 'Caută fără filtre'
+                                          : 'Resetează filtrele',
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        key: const ValueKey('picker-results'),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final exercise = filtered[index];
+                          final selected = _selectedIds.contains(exercise.id);
+                          return Semantics(
+                            selected: widget.multiple ? selected : null,
+                            child: _ExerciseTile(
+                              key: ValueKey('picker-exercise-${exercise.id}'),
+                              exercise: exercise,
+                              onTap: () => _choose(exercise),
+                              trailing: Icon(
+                                selected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.add_circle_outline_rounded,
+                                color: selected
+                                    ? _accent(context)
+                                    : PiColors.muted(context),
+                                size: 24,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              if (widget.multiple && !keyboardOpen)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _selectedIds.isEmpty ? null : _confirm,
+                      icon: const Icon(Icons.add_rounded),
+                      label: Text(
+                        _selectedIds.isEmpty
+                            ? 'Selectează exercițiile'
+                            : 'Adaugă ${_exerciseCount(_selectedIds.length)}',
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
 }
 
 Future<void> _startTraining(
@@ -2169,6 +3221,22 @@ String? _integerError(String? value, int minimum, int maximum) {
       ? 'Introdu un număr între $minimum și $maximum.'
       : null;
 }
+
+String _setCount(int count) => '$count ${count == 1 ? 'set' : 'seturi'}';
+
+String _exerciseCount(int count) =>
+    '$count ${count == 1 ? 'exercițiu' : 'exerciții'}';
+
+bool _matchesExercise(Exercise exercise, String query) {
+  final haystack = _exerciseSearch(exercise);
+  return _searchText(
+    query,
+  ).trim().split(RegExp(r'\s+')).every(haystack.contains);
+}
+
+String _exerciseSearch(Exercise exercise) => _searchText(
+  '${exercise.name} ${exercise.muscle} ${exercise.equipment} ${exercise.secondaryMuscles} ${exercise.difficulty} ${exercise.category} ${exercise.movement} ${exercise.aliases.join(' ')}',
+);
 
 String _searchText(String value) {
   var normalized = value.toLowerCase();

@@ -24,6 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Pi Fit citește pașii, energia activă și antrenamentele din ultimele 7 zile doar la cererea ta, pentru afișare locală. Datele nu sunt trimise către Firebase sau AI.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Pi Fit folosește doar acces de citire la datele de sănătate în această versiune și nu solicită permisiuni de scriere.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

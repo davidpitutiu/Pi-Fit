@@ -6,12 +6,33 @@ nu pretinde că a sincronizat date și afișează recomandările fără server c
 configurarea unui proiect propriu. Codul de aici pregătește integrarea; nu publică
 automat servicii și nu conține chei secrete.
 
-Proiectul selectat în `.firebaserc` este `pi-fit-663f2`. Bindingul ADC din mediul
-de dezvoltare a fost verificat fără expunerea valorilor: este prezent, dar nu
-conține câmpurile necesare unui credential Google utilizabil. Nu s-au putut citi
-aplicațiile înregistrate în proiect și nu s-au făcut modificări la distanță.
-Configurația publică a aplicațiilor poate fi copiată din Firebase Console; pentru
-operațiuni administrative configurează autentificarea CLI sau ADC în afara codului.
+Proiectul selectat în `.firebaserc` este `pi-fit-663f2`. Configurațiile publice
+Android și iOS furnizate sunt incluse în repository, împreună cu opțiunile implicite
+pentru Flutter din `lib/firebase_options.dart`. Pornirea obișnuită nu mai cere
+fișiere locale sau `--dart-define`.
+
+ID-ul aplicației Web furnizat este `1:942783822335:web:52e8ccf86e545c2ed28fca`.
+Opțiunile Web folosesc acest ID, metadatele proiectului și cheia publică de client
+Android a aceluiași proiect. Acesta este un set minim de opțiuni pentru SDK, nu un
+obiect `firebaseConfig` exportat din consolă. Dacă cheia Web are alte restricții,
+înlocuiește-o cu cheia publică Web din consolă folosind helperul de mai jos.
+SDK-ul Web se descarcă de la `www.gstatic.com`; fără acces, aplicația revine la
+modul local după expirarea inițializării.
+
+Validare reală, 15 octombrie 2026: înregistrarea unui cont temporar, loginul cu
+email/parolă, citirea propriului cont și ștergerea lui au răspuns HTTP 200. Contul
+temporar a fost eliminat; nu au fost trimise emailuri. Scrierea unui backup mic
+numai în spațiul acelui cont a fost refuzată de Firestore cu HTTP 403
+`PERMISSION_DENIED`. Backupul cloud nu este încă validat. Verifică în consola
+Firebase regulile publicate pentru `users/{uid}/backups/current` și publică regulile
+din acest repository înainte de a folosi backupul. Nu înlocui regulile cu acces
+public. Cauza exactă a refuzului nu a putut fi confirmată fără acces administrativ;
+mesajul serverului este „Missing or insufficient permissions.” Nu s-au schimbat
+setările administrative ale proiectului.
+
+Bindingul ADC din mediul de dezvoltare este prezent, dar nu conține câmpurile
+necesare unui credential Google utilizabil. Pentru operațiuni administrative,
+configurează autentificarea CLI sau ADC în afara codului.
 
 ## 1. Proiect Firebase și conturi
 
@@ -27,15 +48,14 @@ operațiuni administrative configurează autentificarea CLI sau ADC în afara co
    Publică regulile din `firestore.rules` înainte să folosești conturi reale. Regulile
    permit acces numai utilizatorului autentificat la propriul profil și backup,
    iar contoarele interne ale AI-ului sunt inaccesibile clientului.
-4. Copiază `firebase/client-config.example.json` în
-   `firebase/client-config.local.json` și înlocuiește toate valorile `replace-with`.
-   Fișierul local este ignorat de Git. Configurația Firebase a clientului identifică
-   proiectul și nu înlocuiește regulile de securitate. Nu adăuga cheia OpenAI aici.
+4. Pentru proiectul Pi Fit existent, configurația clientului este deja inclusă.
+   Dacă folosești altă configurație, `firebase/client-config.local.json` rămâne o
+   suprascriere opțională, ignorată de Git. Nu adăuga cheia OpenAI aici.
 5. Rulează din rădăcina proiectului:
 
    ```sh
-   flutter pub get
-   flutter run --dart-define-from-file=firebase/client-config.local.json
+   flutter pub get --enforce-lockfile
+   flutter run -d chrome
    ```
 
 Pentru un singur target poți folosi `FIREBASE_APP_ID` în locul variantelor
@@ -47,16 +67,24 @@ folosește explicit `FirebaseOptions`; un fișier cu secrete de server nu este n
 Cheile publice de client pot fi diferite și restricționate per platformă. Folosește
 `FIREBASE_ANDROID_API_KEY`, `FIREBASE_IOS_API_KEY`, `FIREBASE_WEB_API_KEY`, sau cheia
 comună `FIREBASE_API_KEY` ca fallback. Pentru fișierele descărcate din consolă,
-poți genera configurația locală fără să copiezi manual câmpurile:
+poți regenera configurația inclusă și suprascrierea locală fără să copiezi manual câmpurile:
 
 ```sh
-python3 scripts/configure_firebase.py --android /cale/google-services.json --ios /cale/GoogleService-Info.plist
-# opțional, configurația web salvată ca obiect JSON:
-python3 scripts/configure_firebase.py --web /cale/firebase-web.json
+# Regenerare din fișierele publice deja incluse:
+python scripts/configure_firebase.py
+# Înlocuire din fișiere descărcate recent:
+python scripts/configure_firebase.py --android "firebase/google-services.json" --ios "firebase/GoogleService-Info.plist"
+# Înlocuiește opțiunile Web minime cu obiectul public exportat din consolă:
+python scripts/configure_firebase.py --web "firebase/firebase-web.json"
 ```
 
-Rulează comenzile de conversie din rădăcina repository-ului. Helperul acceptă numai
-proiectul `pi-fit-663f2`, verifică identificatorii și refuză fișierele service account.
+Rulează din rădăcina repository-ului. Helperul actualizează `lib/firebase_options.dart`,
+fișierele native, `firebase/web-config.json` și fișierul opțional local de defines.
+Acceptă numai proiectul `pi-fit-663f2`, verifică identificatorii și refuză
+credențiale de server înainte de a modifica fișiere. Nu ai nevoie să rulezi
+helperul pentru pornirea obișnuită; configurația este deja inclusă.
+Pe Windows fără runtime Python, `py install default` instalează runtime-ul;
+managerul Python singur nu poate executa scripturi.
 
 Backupul este un snapshot JSON la `users/{uid}/backups/current`, cu timestamp de
 server și versiune de schemă. Este potrivit pentru uz personal; Firestore limitează
@@ -64,6 +92,12 @@ un document la 1 MiB. Restaurarea citește explicit de pe server și eșuează d
 rețeaua lipsește, fără a prezenta un cache vechi ca versiune sincronizată. Datele
 locale ale dispozitivului și backupul nu sunt un sistem colaborativ de sincronizare
 în timp real. Verifică datele înainte de a restaura un snapshot.
+
+Ecranul Cont include creare cont, login, resetarea parolei, retrimiterea verificării
+emailului și ștergerea contului cu parola curentă. Ștergerea reautentifică întâi
+utilizatorul, apoi șterge backupul/profilul cloud și contul Auth. Dacă Firestore
+refuză curățarea, contul rămâne activ pentru a putea reîncerca. Datele locale ale
+dispozitivului se păstrează și pot fi gestionate separat.
 
 ## 2. Server AI autentificat
 
@@ -102,7 +136,7 @@ chat, cod, `--dart-define` sau în aplicație. La deploy poți configura:
 
 | Parametru server | Valoare implicită | Scop |
 | --- | --- | --- |
-| `AI_MODEL` | `gpt-4.1-mini` | Model OpenAI compatibil cu Responses API |
+| `AI_MODEL` | `gpt-4.1` | Model OpenAI compatibil cu Responses API; poate fi configurat pe server |
 | `ALLOWED_ORIGINS` | gol | Originile web permise, separate prin virgulă, fără slash final |
 | `REQUIRE_APP_CHECK` | `false` | Solicită și verifică un token App Check |
 
@@ -111,13 +145,27 @@ Aplicațiile mobile nu trimit `Origin`. Previewul web necesită originile exacte
 Pune URL-ul HTTPS al funcției `coach` în `AI_COACH_URL` din configurația clientului
 și reconstruiește aplicația. Funcția se află în `europe-west1`.
 
-Clientul trimite numai mesajul, contextul antrenamentelor și un ID token Firebase.
+Cu acordul explicit din profil și un cont autentificat, clientul trimite mesajul,
+preferințele sportive, statistici pe 28 de zile, până la 8 antrenamente recente,
+programările viitoare și conversația recentă, împreună cu un ID token Firebase.
+Contextul JSON este limitat la 24.000 de caractere, iar conversația la 12 mesaje
+de utilizator/asistent, 3.000 de caractere fiecare și 18.000 în total. Serverul
+respinge roluri precum `system`, câmpuri suplimentare și depășirea limitelor.
 Serverul verifică tokenul, respinge conturile anonime, limitează fiecare utilizator
 la 10 cereri/minut și 100/24 ore prin tranzacții Firestore și validează dimensiunile
 inputului. Nu expune cheia furnizorului și nu acceptă modelul ales de client.
 Mesajele și tokenurile nu sunt logate; cererea OpenAI setează `store: false`.
 Contextul este totuși transmis furnizorului pentru generarea răspunsului; configurează
 politica de confidențialitate și informează utilizatorii înaintea lansării publice.
+Fără acord sau fără backend configurat, recomandările locale folosesc profilul și
+seturile disponibile pe dispozitiv și sunt etichetate clar. Nu simulează un model
+AI și nu programează antrenamente în urma unui mesaj. Recomandările de progres
+compară seturile finalizate din ședințe reale; nu inventează recorduri sau greutăți.
+
+AI-ul online nu este încă activat în proiect: mediul nu are o cheie de furnizor
+utilizabilă și configurația clientului nu are `AI_COACH_URL`. Backendul include
+testarea unui dialog cu întrebări ulterioare prin furnizor simulat; aceasta nu
+înlocuiește verificarea serviciului publicat cu un cont real.
 
 Verificarea App Check există pe server, dar este dezactivată implicit. Pentru a o
 activa, înregistrează întâi aplicațiile în Firebase App Check, integrează SDK-ul

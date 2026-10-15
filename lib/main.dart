@@ -9,6 +9,9 @@ import 'ui/home_screen.dart';
 import 'ui/training_screens.dart';
 import 'ui/planning_screens.dart';
 import 'ui/account_coach.dart';
+import 'ui/auth_scope_gate.dart';
+
+final _navigationKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,10 +42,18 @@ class PiFitApp extends StatelessWidget {
     animation: store,
     builder: (context, _) => MaterialApp(
       title: 'Pi Fit',
+      navigatorKey: _navigationKey,
       debugShowCheckedModeBanner: false,
       theme: piTheme(Brightness.light),
       darkTheme: piTheme(Brightness.dark),
       themeMode: store.themeMode,
+      builder: (context, child) => GlassBackground(
+        child: AuthScopeGate(
+          store: store,
+          navigatorKey: _navigationKey,
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
       home: PiShell(store: store, startupWarning: startupWarning),
     ),
   );
@@ -74,39 +85,88 @@ class _PiShellState extends State<PiShell> {
         store: widget.store,
         onNavigate: (i) => setState(() => index = i),
       ),
-      RoutinesScreen(store: widget.store),
       ExercisesScreen(store: widget.store),
+      ProgressScreen(store: widget.store),
       CalendarScreen(store: widget.store),
-      CoachScreen(store: widget.store),
+      AccountScreen(store: widget.store, embedded: true),
     ];
     return Scaffold(
       body: IndexedStack(index: index, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (value) => setState(() => index = value),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_rounded),
-            selectedIcon: Icon(Icons.grid_view_rounded),
-            label: 'Acasă',
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+          child: PiCard(
+            radius: 25,
+            padding: const EdgeInsets.all(5),
+            child: Row(
+              children: List.generate(5, (i) {
+                const labels = [
+                  'Acasă',
+                  'Exerciții',
+                  'Progres',
+                  'Calendar',
+                  'Profil',
+                ];
+                const icons = [
+                  Icons.home_outlined,
+                  Icons.fitness_center_rounded,
+                  Icons.insights_outlined,
+                  Icons.calendar_month_outlined,
+                  Icons.person_outline_rounded,
+                ];
+                final selected = index == i;
+                return Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: selected,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => setState(() => index = i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? PiColors.lime.withValues(
+                                  alpha: PiColors.dark(context) ? 0.13 : 0.28,
+                                )
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              icons[i],
+                              size: 22,
+                              color: selected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : PiColors.muted(context),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              labels[i],
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: selected
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : PiColors.muted(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.fitness_center_rounded),
-            label: 'Antrenamente',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.category_outlined),
-            label: 'Exerciții',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            label: 'Calendar',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            label: 'Pi Coach',
-          ),
-        ],
+        ),
       ),
     );
   }

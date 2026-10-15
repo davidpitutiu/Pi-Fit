@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/models.dart';
 import '../domain/exercise_catalog.dart';
+import '../domain/training_analytics.dart';
+import '../domain/user_profile.dart';
 import '../services/notification_service.dart';
 
 class AppStore extends ChangeNotifier {
@@ -16,9 +18,19 @@ class AppStore extends ChangeNotifier {
   ];
   final SharedPreferences preferences;
   AppStore(this.preferences);
+  String? _accountId;
+  int _scopeRevision = 0;
+  String? get accountId => _accountId;
+  Future<void> _accountSwitchQueue = Future.value();
   ThemeMode themeMode = ThemeMode.dark;
   String name = 'Atlet';
   String goal = 'Forță și masă musculară';
+  UserProfile _profile = UserProfile();
+  UserProfile get profile => _profile;
+  Set<String> _favoriteExerciseIds = {};
+  Set<String> get favoriteExerciseIds => Set.unmodifiable(_favoriteExerciseIds);
+  TrainingAnalytics get analytics =>
+      analyzeTraining(history: history, exercises: exercises, profile: profile);
   List<Routine> customRoutines = [];
   List<WorkoutSession> history = [];
   List<ScheduledWorkout> schedule = [];
@@ -50,8 +62,226 @@ class AppStore extends ChangeNotifier {
     return null;
   }
 
-  String get _storageKey => 'pifit.local.v1';
-  String get _corruptKey => 'pifit.recovery.v1';
+  String get _scopePrefix =>
+      _accountId == null ? 'pifit' : 'pifit.account.$_accountId';
+  String get _storageKey =>
+      _accountId == null ? 'pifit.local.v1' : '$_scopePrefix.v1';
+  String get _corruptKey => '$_scopePrefix.recovery.v1';
+
+  Map<String, dynamic>? _guestJournal() {
+    final raw = preferences.getString('pifit.local.v1');
+    if (raw == null) return null;
+    try {
+      final data = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      _validateBackup(data);
+      return data;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool get hasGuestJournal {
+    final guest = _guestJournal();
+    if (guest == null) return false;
+    return [
+      'history',
+      'routines',
+      'schedule',
+      'favoriteExerciseIds',
+    ].any((key) => (guest[key] as List? ?? const []).isNotEmpty);
+  }
+
+  /// An explicit copy operation. Signing in never moves guest data silently.
+  /// Current account preferences and its active workout remain untouched.
+  Future<void> importGuestJournal() {
+    final operation = _accountSwitchQueue.then((_) => _importGuestJournal());
+    _accountSwitchQueue = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
+  }
+
+  Future<void> _importGuestJournal() async {
+    if (_accountId == null) {
+      throw StateError('Autentifică-te înainte de a importa jurnalul local.');
+    }
+    final guest = _guestJournal();
+    if (guest == null) {
+      throw StateError('Nu există un jurnal local valid pentru import.');
+    }
+    final merged = exportData();
+    final mergedRoutines = [...customRoutines];
+    final available = {for (final routine in routines) routine.id: routine};
+    final routineIds = <String, String>{};
+    String content(Routine routine) =>
+        jsonEncode({...routine.toJson(), 'id': ''});
+    for (final value in guest['routines'] as List) {
+      final routine = Routine.fromJson(_object(value));
+      final originalId = routine.id;
+      var id = originalId;
+      if (available[id] != null &&
+          content(available[id]!) != content(routine)) {
+        // Stable 32-bit content fingerprint: repeated imports find the same
+        // copied routine. Multiplication by 31 is exact on Dart native and web;
+        // collisions are checked against the complete canonical content.
+        var hash = 0x811c9dc5;
+        for (final unit in content(routine).codeUnits) {
+          hash = ((hash ^ unit) * 31) & 0xffffffff;
+        }
+        final base = 'guest-${hash.toRadixString(16)}';
+        id = base;
+        var suffix = 1;
+        while (available[id] != null &&
+            content(available[id]!) != content(routine)) {
+          id = '$base-${suffix++}';
+        }
+      }
+      routineIds[originalId] = id;
+      if (!available.containsKey(id)) {
+        final copied = routine.copyWith(id: id);
+        mergedRoutines.add(copied);
+        available[id] = copied;
+      }
+    }
+    final mergedHistory = [...history];
+    final historyIds = history.map((item) => item.id).toSet();
+    // A current active workout also owns its ID; never replace it on import.
+    if (activeSession != null) historyIds.add(activeSession!.id);
+    for (final value in guest['history'] as List) {
+      final session = WorkoutSession.fromJson(_object(value));
+      if (historyIds.add(session.id)) mergedHistory.add(session);
+    }
+    mergedHistory.sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    final mergedSchedule = [...schedule];
+    final scheduleIds = schedule.map((item) => item.id).toSet();
+    for (final value in guest['schedule'] as List) {
+      final event = ScheduledWorkout.fromJson(_object(value));
+      if (scheduleIds.add(event.id)) {
+        mergedSchedule.add(
+          ScheduledWorkout(
+            id: event.id,
+            routineId: routineIds[event.routineId] ?? event.routineId,
+            date: event.date,
+            reminder: event.reminder,
+          ),
+        );
+      }
+    }
+    mergedSchedule.sort((a, b) => a.date.compareTo(b.date));
+    merged['routines'] = mergedRoutines.map((item) => item.toJson()).toList();
+    merged['history'] = mergedHistory.map((item) => item.toJson()).toList();
+    merged['schedule'] = mergedSchedule.map((item) => item.toJson()).toList();
+    merged['favoriteExerciseIds'] = {
+      ..._favoriteExerciseIds,
+      ...List<String>.from(guest['favoriteExerciseIds'] as List? ?? const []),
+    }.toList()..sort();
+    if (jsonEncode(merged) == jsonEncode(exportData())) return;
+    await _restoreBackup(merged);
+  }
+
+  /// Each authenticated account has its own local document. Guest data is
+  /// intentionally never imported automatically into a newly signed-in user.
+  /// Calls are serialized because authentication can emit overlapping events.
+  Future<void> switchAccount(String? uid) {
+    if (uid != null && (uid.trim().isEmpty || uid.length > 128)) {
+      return Future.error(ArgumentError('Identificator de cont invalid.'));
+    }
+    final operation = _accountSwitchQueue.then((_) => _switchAccount(uid));
+    _accountSwitchQueue = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
+  }
+
+  Future<void> _switchAccount(String? uid) async {
+    if (uid == _accountId) return;
+    final candidate = AppStore(preferences)
+      .._accountId = uid
+      ..themeMode = themeMode;
+    final raw = preferences.getString(candidate._storageKey);
+    if (raw != null) {
+      try {
+        candidate._restore(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      } catch (_) {
+        final preserved = await candidate._preserveRecovery(raw);
+        throw FormatException(
+          preserved
+              ? 'Datele acestui cont nu pot fi citite. Copia de recuperare a fost păstrată.'
+              : 'Datele acestui cont nu pot fi citite. Originalul nu a fost modificat.',
+        );
+      }
+    }
+    final requested = candidate.schedule
+        .where((event) => event.reminder && event.date.isAfter(DateTime.now()))
+        .toList();
+    candidate.schedule = candidate.schedule
+        .map((event) => event.copyWith(reminder: false))
+        .toList();
+    // Prove that the new document can be persisted before replacing the live
+    // scope. Failed writes leave both the previous user and target untouched.
+    await candidate._writeLocal(jsonEncode(candidate.exportData()));
+    final previousReminders = schedule
+        .where((event) => event.reminder)
+        .toList();
+    final previousScope = _accountId;
+    _accountId = uid;
+    _scopeRevision++;
+    _restore(candidate.exportData());
+    persistenceError = null;
+    notifyListeners();
+    Object? reminderError;
+    for (final event in previousReminders) {
+      try {
+        await _cancelReminder(event.id, previousScope);
+      } catch (error) {
+        reminderError ??= error;
+      }
+    }
+    for (final event in requested) {
+      try {
+        await NotificationService.instance.cancel(event.id);
+        await NotificationService.instance.schedule(
+          _notificationId(uid, event.id),
+          event.date,
+          routineById(event.routineId)?.name ?? 'Antrenament',
+        );
+        await _commit(() {
+          final index = schedule.indexWhere((item) => item.id == event.id);
+          if (index >= 0) {
+            schedule[index] = schedule[index].copyWith(reminder: true);
+          }
+        });
+      } catch (error) {
+        reminderError ??= error;
+        // A scheduled notification whose enabled flag could not be persisted
+        // must also be cancelled, keeping the visible state honest.
+        try {
+          await _cancelReminder(event.id, uid);
+        } catch (_) {}
+        break;
+      }
+    }
+    if (reminderError != null) {
+      persistenceError =
+          'Contul este deschis. Unele remindere nu au putut fi sincronizate pe acest dispozitiv.';
+      notifyListeners();
+    }
+  }
+
+  Future<bool> _preserveRecovery(String raw) async {
+    final existing = preferences.getString(_corruptKey);
+    final key = existing == null || existing == raw
+        ? _corruptKey
+        : '$_corruptKey.${DateTime.now().microsecondsSinceEpoch}';
+    try {
+      return await preferences.setString(key, raw);
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> load() async {
     final raw = preferences.getString(_storageKey);
     if (raw == null) return;
@@ -59,11 +289,7 @@ class AppStore extends ChangeNotifier {
       _restore(Map<String, dynamic>.from(jsonDecode(raw) as Map));
       persistenceError = null;
     } catch (_) {
-      final existing = preferences.getString(_corruptKey);
-      final key = existing == null || existing == raw
-          ? _corruptKey
-          : '$_corruptKey.${DateTime.now().microsecondsSinceEpoch}';
-      final preserved = await preferences.setString(key, raw);
+      final preserved = await _preserveRecovery(raw);
       persistenceError = preserved
           ? 'Datele locale nu au putut fi citite. O copie de recuperare a fost păstrată.'
           : 'Datele locale nu au putut fi citite. Datele originale nu au fost modificate.';
@@ -93,6 +319,12 @@ class AppStore extends ChangeNotifier {
           );
     final loadedName = _profileName(data['name'] as String);
     final loadedGoal = _profileGoal(data['goal'] as String);
+    final loadedProfile = data['profile'] == null
+        ? UserProfile()
+        : UserProfile.fromJson(_object(data['profile']));
+    final loadedFavorites = Set<String>.from(
+      data['favoriteExerciseIds'] as List? ?? const [],
+    );
     final loadedTheme = ThemeMode.values.firstWhere(
       (t) => t.name == data['theme'],
       orElse: () => ThemeMode.dark,
@@ -100,6 +332,8 @@ class AppStore extends ChangeNotifier {
     // Parsing and normalization must all succeed before replacing any state.
     name = loadedName;
     goal = loadedGoal;
+    _profile = loadedProfile;
+    _favoriteExerciseIds = loadedFavorites;
     themeMode = loadedTheme;
     customRoutines = loadedRoutines;
     history = loadedHistory;
@@ -111,13 +345,40 @@ class AppStore extends ChangeNotifier {
     'version': 1,
     'name': name,
     'goal': goal,
+    'profile': profile.toJson(),
+    'favoriteExerciseIds': _favoriteExerciseIds.toList()..sort(),
     'theme': themeMode.name,
     'routines': customRoutines.map((r) => r.toJson()).toList(),
     'history': history.map((r) => r.toJson()).toList(),
     'schedule': schedule.map((r) => r.toJson()).toList(),
     'active': activeSession?.toJson(),
   };
-  Future<void> restoreBackup(Map<String, dynamic> data) async {
+
+  /// A network caller should pass the UID captured before fetching its backup.
+  /// The scope is checked again after queued account changes have completed.
+  /// Switches cannot run during the local recovery/write/reminder transaction.
+  Future<void> restoreBackup(
+    Map<String, dynamic> data, {
+    String? expectedAccountId,
+  }) {
+    final scope = expectedAccountId ?? _accountId;
+    final operation = _accountSwitchQueue.then((_) async {
+      if (_accountId != scope) {
+        throw StateError(
+          'Contul s-a schimbat. Reîncearcă restaurarea în contul dorit.',
+        );
+      }
+      await _restoreBackup(data);
+    });
+    _accountSwitchQueue = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
+  }
+
+  Future<void> _restoreBackup(Map<String, dynamic> data) async {
+    final scope = _accountId;
     // Validate in a separate store so malformed imports and persistence errors
     // leave the live profile and active workout entirely untouched.
     final imported = AppStore(preferences).._restore(data);
@@ -130,7 +391,7 @@ class AppStore extends ChangeNotifier {
     final before = exportData();
     final oldReminders = schedule.where((event) => event.reminder).toList();
     final recoverySaved = await preferences.setString(
-      'pifit.before_restore.v1',
+      '$_scopePrefix.before_restore.v1',
       jsonEncode(before),
     );
     if (!recoverySaved) {
@@ -144,7 +405,7 @@ class AppStore extends ChangeNotifier {
     Object? cancellationError;
     for (final event in oldReminders) {
       try {
-        await NotificationService.instance.cancel(event.id);
+        await _cancelReminder(event.id, scope);
       } catch (error) {
         cancellationError ??= error;
       }
@@ -165,11 +426,12 @@ class AppStore extends ChangeNotifier {
 
   Future<void> _commit(void Function() change) async {
     final before = exportData();
+    final scope = _accountId;
     try {
       change();
       await _save();
     } catch (_) {
-      _restore(before);
+      if (_accountId == scope) _restore(before);
       notifyListeners();
       rethrow;
     }
@@ -177,25 +439,43 @@ class AppStore extends ChangeNotifier {
 
   Future<void> _scheduleReminders(List<ScheduledWorkout> requested) async {
     if (requested.isEmpty) return;
+    final scope = _accountId;
+    final revision = _scopeRevision;
+    bool sameScope() => _accountId == scope && _scopeRevision == revision;
     Object? failure;
     for (final event in requested) {
+      if (!sameScope()) return;
       try {
+        // Remove a notification from older app versions which used the bare
+        // event ID. New notifications always include their owning profile.
+        await NotificationService.instance.cancel(event.id);
+        if (!sameScope()) return;
         await NotificationService.instance.schedule(
-          event.id,
+          _notificationId(scope, event.id),
           event.date,
           routineById(event.routineId)?.name ?? 'Antrenament',
         );
+        if (!sameScope()) {
+          // A permission sheet can outlive the signed-in profile. Remove its
+          // late notification, and never update another account's calendar.
+          try {
+            await _cancelReminder(event.id, scope);
+          } catch (_) {}
+          return;
+        }
         final index = schedule.indexWhere((item) => item.id == event.id);
         if (index >= 0) {
           schedule[index] = schedule[index].copyWith(reminder: true);
         }
       } catch (error) {
+        if (!sameScope()) return;
         failure = error;
         // Do not repeatedly prompt for permission or retry an unsupported
         // platform for each date in a bulk plan.
         break;
       }
     }
+    if (!sameScope()) return;
     await _save();
     if (failure != null) {
       throw StateError(
@@ -205,24 +485,45 @@ class AppStore extends ChangeNotifier {
     }
   }
 
+  static String _notificationId(String? accountId, String eventId) =>
+      accountId == null ? 'guest/$eventId' : 'account/$accountId/$eventId';
+
+  Future<void> _cancelReminder(String eventId, String? scope) async {
+    Object? failure;
+    try {
+      await NotificationService.instance.cancel(
+        _notificationId(scope, eventId),
+      );
+    } catch (error) {
+      failure = error;
+    }
+    try {
+      await NotificationService.instance.cancel(eventId);
+    } catch (error) {
+      failure ??= error;
+    }
+    if (failure != null) throw failure;
+  }
+
   Future<void> _save() async {
     await _writeLocal(jsonEncode(exportData()));
     notifyListeners();
   }
 
   Future<void> _writeLocal(String value) async {
-    final previous = preferences.getString(_storageKey);
+    final storageKey = _storageKey;
+    final previous = preferences.getString(storageKey);
     try {
-      if (await preferences.setString(_storageKey, value)) return;
+      if (await preferences.setString(storageKey, value)) return;
     } catch (_) {
       // Restore the preferences cache too: the legacy preferences API updates
       // its cache before the platform confirms a successful disk write.
     }
     try {
       if (previous == null) {
-        await preferences.remove(_storageKey);
+        await preferences.remove(storageKey);
       } else {
-        await preferences.setString(_storageKey, previous);
+        await preferences.setString(storageKey, previous);
       }
     } catch (_) {
       // The in-memory AppStore transaction still rolls back, and a recovery
@@ -239,6 +540,35 @@ class AppStore extends ChangeNotifier {
     await _commit(() {
       name = _profileName(newName);
       goal = _profileGoal(newGoal);
+    });
+  }
+
+  /// Save the complete account editor in one transaction, including name and
+  /// goal, so failed persistence cannot leave only part of a profile updated.
+  Future<void> updateUserProfile(
+    UserProfile value, {
+    String? newName,
+    String? newGoal,
+  }) async {
+    final validated = UserProfile.fromJson(value.toJson());
+    await _commit(() {
+      _profile = validated;
+      if (newName != null) name = _profileName(newName);
+      if (newGoal != null) goal = _profileGoal(newGoal);
+    });
+  }
+
+  Future<void> setExerciseFavorite(String id, bool value) async {
+    if (value && !exercises.any((exercise) => exercise.id == id)) {
+      throw ArgumentError('Selectează un exercițiu din catalog.');
+    }
+    await _commit(() {
+      _favoriteExerciseIds = {..._favoriteExerciseIds};
+      if (value) {
+        _favoriteExerciseIds.add(id);
+      } else {
+        _favoriteExerciseIds.remove(id);
+      }
     });
   }
 
@@ -444,8 +774,9 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> removeScheduled(String id) async {
+    final scope = _accountId;
     await _commit(() => schedule.removeWhere((e) => e.id == id));
-    await NotificationService.instance.cancel(id);
+    await _cancelReminder(id, scope);
   }
 
   double get totalVolume => history.fold(0.0, (sum, s) => sum + s.volume);
@@ -461,8 +792,134 @@ class AppStore extends ChangeNotifier {
         .length;
   }
 
+  /// Structured context is also used by the on-device coach. The service must
+  /// require explicit consent before transmitting any of it remotely. Free-text
+  /// notes and limitations are excluded entirely until consent is given.
   String get coachContext =>
-      'Obiectiv: $goal. Antrenamente în această săptămână: $weeklyCount. Total antrenamente: ${history.length}. Ultimele rutine: ${history.take(3).map((s) => s.routineName).join(', ')}. Nu presupune informații medicale sau greutăți optime.';
+      _buildCoachContext(includePrivateText: profile.coachConsent);
+
+  /// This context is exclusively for the on-device coach. Services must never
+  /// attach it to an HTTP request when remote consent is disabled.
+  String get localCoachContext => _buildCoachContext(includePrivateText: true);
+
+  String _buildCoachContext({required bool includePrivateText}) {
+    final now = DateTime.now();
+    final stats = analytics;
+    String bounded(String value, int max) =>
+        value.length <= max ? value : value.substring(0, max);
+    final profileData = profile.toJson()..remove('limitations');
+    if (includePrivateText) {
+      profileData['limitations'] = profile.limitations;
+    }
+    final recent =
+        history
+            .where(
+              (session) =>
+                  session.finishedAt != null &&
+                  !session.startedAt.isAfter(now) &&
+                  !session.finishedAt!.isAfter(now) &&
+                  !session.finishedAt!.isBefore(session.startedAt) &&
+                  session.completedSets > 0,
+            )
+            .toList()
+          ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    final sessionData = recent
+        .take(8)
+        .map(
+          (session) => <String, dynamic>{
+            'startedAt': session.startedAt.toIso8601String(),
+            'finishedAt': session.finishedAt!.toIso8601String(),
+            'routineName': bounded(session.routineName, 72),
+            'exercises': session.exercises.take(6).map((item) {
+              final exercise = exerciseById(item.exerciseId);
+              return {
+                'exerciseId': bounded(item.exerciseId, 80),
+                'name': bounded(exercise.name, 72),
+                'muscle': bounded(exercise.muscle, 60),
+                'equipment': bounded(exercise.equipment, 60),
+                'sets': item.sets
+                    .where(
+                      (set) =>
+                          set.completed &&
+                          set.reps > 0 &&
+                          set.reps <= 1000 &&
+                          set.weight.isFinite &&
+                          set.weight >= 0 &&
+                          set.weight <= 2000,
+                    )
+                    .take(4)
+                    .map(
+                      (set) => {
+                        'reps': set.reps,
+                        'weight': set.weight,
+                        'completed': true,
+                      },
+                    )
+                    .toList(),
+              };
+            }).toList(),
+            if (includePrivateText && session.notes.isNotEmpty)
+              'notes': bounded(session.notes, 400),
+          },
+        )
+        .toList();
+    final upcoming = schedule.where((item) => item.date.isAfter(now)).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    final context = <String, dynamic>{
+      'schemaVersion': 2,
+      'goal': goal,
+      'profile': profileData,
+      'statistics': {
+        'windowDays': 28,
+        'workoutCount': stats.workoutCountLast28,
+        'activeDays': stats.activeDaysLast28,
+        'targetActiveDays': stats.targetDaysLast28,
+        'completedSets': stats.completedSetsLast28,
+        'volumeKgReps': stats.volumeLast28,
+        'consistencyScore': stats.score,
+        'muscles': stats.muscles
+            .take(10)
+            .map(
+              (item) => {
+                'muscle': bounded(item.muscle, 60),
+                'completedSets': item.completedSets,
+                'volume': item.volume,
+              },
+            )
+            .toList(),
+        'weeks': stats.weeks
+            .map(
+              (week) => {
+                'start': week.start.toIso8601String(),
+                'activeDays': week.activeDays,
+                'completedSets': week.completedSets,
+                'volume': week.volume,
+              },
+            )
+            .toList(),
+      },
+      'recentSessions': sessionData,
+      'upcomingWorkouts': upcoming
+          .take(6)
+          .map(
+            (item) => {
+              'date': item.date.toIso8601String(),
+              'routineName': bounded(
+                routineById(item.routineId)?.name ?? 'Antrenament',
+                72,
+              ),
+            },
+          )
+          .toList(),
+    };
+    // Remove complete old sessions, never truncate encoded JSON mid-document.
+    var encoded = jsonEncode(context);
+    while (encoded.length > 10000 && sessionData.isNotEmpty) {
+      sessionData.removeLast();
+      encoded = jsonEncode(context);
+    }
+    return encoded;
+  }
 }
 
 Never _invalidBackup() => throw const FormatException(
@@ -564,6 +1021,15 @@ void _validateBackup(Map<String, dynamic> data) {
       data['theme'] is! String ||
       !data.containsKey('active')) {
     _invalidBackup();
+  }
+  if (data['profile'] != null) {
+    UserProfile.fromJson(_object(data['profile']));
+  }
+  if (data['favoriteExerciseIds'] != null) {
+    final favorites = <String>{};
+    for (final id in _list(data['favoriteExerciseIds'])) {
+      _uniqueId(favorites, id);
+    }
   }
   final routineIds = routineTemplates.map((routine) => routine.id).toSet();
   for (final item in _list(data['routines'])) {

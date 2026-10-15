@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "942783822335",
+    "project_id": "pi-fit-663f2",
+    "storage_bucket": "pi-fit-663f2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942783822335:android:7b359eb2de6b6240d28fca",
+        "android_client_info": {
+          "package_name": "com.pifit.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4-bd6HZvyzf1TJIjGNDx6aQ3PBZrk-Y4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

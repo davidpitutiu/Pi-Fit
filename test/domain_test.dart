@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_fit/domain/exercise_catalog.dart';
@@ -9,8 +10,8 @@ Map<String, dynamic> persisted(Map<String, dynamic> json) =>
 
 void main() {
   group('Exercise catalog', () {
-    test('has unique IDs and actionable original coaching instructions', () {
-      expect(exerciseCatalog.length, greaterThanOrEqualTo(50));
+    test('has a full external catalog and original coaching instructions', () {
+      expect(exerciseCatalog.length, 878);
       expect(
         exerciseCatalog.map((exercise) => exercise.id).toSet().length,
         exerciseCatalog.length,
@@ -20,14 +21,133 @@ void main() {
         expect(exercise.muscle, isNotEmpty, reason: exercise.name);
         expect(exercise.equipment, isNotEmpty, reason: exercise.name);
         expect(exercise.description, isNotEmpty, reason: exercise.name);
+        expect(exercise.steps, isNotEmpty, reason: exercise.name);
+        if (exercise.instructionLanguage == 'ro') {
+          expect(
+            exercise.steps.length,
+            greaterThanOrEqualTo(3),
+            reason: exercise.name,
+          );
+        }
+        expect(exercise.instructionLanguage, isIn(['ro', 'en']));
+        expect(exercise.tips, isNotEmpty, reason: exercise.name);
         expect(
-          exercise.steps.length,
-          greaterThanOrEqualTo(3),
+          exercise.difficulty,
+          isIn(['Începător', 'Intermediar', 'Avansat']),
           reason: exercise.name,
         );
-        expect(exercise.tips, isNotEmpty, reason: exercise.name);
+        expect(
+          exercise.category,
+          isIn(['Forță', 'Cardio', 'Mobilitate', 'Pliometrie']),
+          reason: exercise.name,
+        );
+        expect(exercise.movement, isNotEmpty, reason: exercise.name);
+        expect(exercise.aliases, isNotEmpty, reason: exercise.name);
+        expect(exercise.sourceName, isNotEmpty, reason: exercise.name);
       }
     });
+
+    test(
+      'images are bundled or pinned remote assets, with honest missing states',
+      () {
+        const missingSourcePhotos = {
+          'Kettlebell_Halo',
+          'Kettlebell_Halo_With_Overhead_Extension',
+          'Kettlebell_Overhead_Triceps_Extension',
+        };
+        const photoBase =
+            'https://raw.githubusercontent.com/yuhonas/free-exercise-db/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/';
+        for (final exercise in exerciseCatalog) {
+          if (exercise.imageAsset.isNotEmpty) {
+            expect(exercise.imageAsset, startsWith('assets/exercises/'));
+            expect(
+              File(exercise.imageAsset).existsSync(),
+              isTrue,
+              reason: exercise.name,
+            );
+          } else if (exercise.imageUrl.isNotEmpty) {
+            expect(exercise.imageUrl, startsWith(photoBase));
+            expect(Uri.parse(exercise.imageUrl).scheme, 'https');
+            expect(exercise.secondaryImageUrl, startsWith(photoBase));
+          } else {
+            expect(
+              missingSourcePhotos,
+              contains(exercise.sourceId),
+              reason: exercise.name,
+            );
+          }
+          if (exercise.secondaryImageAsset.isNotEmpty) {
+            expect(
+              File(exercise.secondaryImageAsset).existsSync(),
+              isTrue,
+              reason: '${exercise.name}: ${exercise.secondaryImageAsset}',
+            );
+            expect(exercise.secondaryImageAsset, isNot(exercise.imageAsset));
+          }
+        }
+        expect(
+          exerciseCatalog
+              .where((exercise) => exercise.imageAsset.isNotEmpty)
+              .length,
+          216,
+        );
+        expect(
+          exerciseCatalog
+              .where((exercise) => exercise.imageUrl.isNotEmpty)
+              .length,
+          659,
+        );
+      },
+    );
+
+    test(
+      'covers every pinned source record once and retains English source instructions',
+      () {
+        final snapshot =
+            jsonDecode(
+                  File('assets/exercise-data/catalog.json').readAsStringSync(),
+                )
+                as Map<String, dynamic>;
+        final source = snapshot['source'] as Map<String, dynamic>;
+        final records = (snapshot['exercises'] as List)
+            .cast<Map<String, dynamic>>();
+        expect(records.length, 876);
+        expect(source['revision'], 'f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5');
+        expect(source['license'], 'Unlicense');
+        expect((source['sourceSha256'] as String).length, 64);
+        expect((source['canonicalSha256'] as String).length, 64);
+        final sourced = exerciseCatalog
+            .where((exercise) => exercise.sourceId.isNotEmpty)
+            .toList();
+        expect(sourced.length, records.length);
+        expect(
+          sourced.map((exercise) => exercise.sourceId).toSet(),
+          records.map((record) => record['id']).toSet(),
+        );
+        final bySource = {
+          for (final exercise in sourced) exercise.sourceId: exercise,
+        };
+        for (final record in records) {
+          final exercise = bySource[record['id']]!;
+          if (exercise.instructionLanguage == 'en') {
+            expect(
+              exercise.steps,
+              (record['instructions'] as List)
+                  .cast<String>()
+                  .where((step) => step.trim().isNotEmpty)
+                  .toList(),
+              reason: exercise.name,
+            );
+          }
+        }
+        expect(
+          sourced
+              .where((exercise) => exercise.instructionLanguage == 'en')
+              .length,
+          660,
+        );
+      },
+    );
 
     test(
       'every template references known exercises and has valid set targets',
@@ -64,10 +184,37 @@ void main() {
   });
 
   group('Persistence', () {
-    test('exercise retains steps and tips after JSON serialization', () {
-      final original = exerciseCatalog.first;
-      final restored = Exercise.fromJson(persisted(original.toJson()));
-      expect(restored.toJson(), original.toJson());
+    test(
+      'all exercises retain coaching and image metadata after JSON serialization',
+      () {
+        for (final original in exerciseCatalog) {
+          final restored = Exercise.fromJson(persisted(original.toJson()));
+          expect(restored.toJson(), original.toJson(), reason: original.name);
+        }
+      },
+    );
+
+    test('old custom exercises remain readable without new image metadata', () {
+      final restored = Exercise.fromJson({
+        'id': 'custom-old',
+        'name': 'Exercițiul meu',
+        'muscle': 'Piept',
+        'equipment': 'Gantere',
+      });
+      expect(restored.id, 'custom-old');
+      expect(restored.imageAsset, isEmpty);
+      expect(restored.secondaryImageAsset, isEmpty);
+      expect(restored.imageUrl, isEmpty);
+      expect(restored.secondaryImageUrl, isEmpty);
+      expect(restored.instructionLanguage, 'ro');
+      expect(restored.sourceId, isEmpty);
+      expect(restored.difficulty, 'Intermediar');
+      expect(restored.category, 'Forță');
+      expect(restored.aliases, isEmpty);
+      expect(
+        Exercise.fromJson(persisted(restored.toJson())).toJson(),
+        restored.toJson(),
+      );
     });
 
     test('routine retains all set prescriptions after JSON serialization', () {
@@ -193,23 +340,26 @@ void main() {
       expect(firstSet.weight, routine.exercises.first.weight);
     });
 
-    test('copyWith preserves an existing finish date and never yields negative duration', () {
-      final start = DateTime.utc(2026, 10, 15, 10);
-      final finish = start.add(const Duration(minutes: 35));
-      final session = WorkoutSession(
-        id: 'finish-1',
-        routineName: 'Test',
-        startedAt: start,
-        finishedAt: finish,
-        exercises: const [],
-      );
-      expect(session.copyWith(notes: 'Done').finishedAt, finish);
-      expect(
-        session
-            .copyWith(finishedAt: start.subtract(const Duration(seconds: 1)))
-            .duration,
-        Duration.zero,
-      );
-    });
+    test(
+      'copyWith preserves an existing finish date and never yields negative duration',
+      () {
+        final start = DateTime.utc(2026, 10, 15, 10);
+        final finish = start.add(const Duration(minutes: 35));
+        final session = WorkoutSession(
+          id: 'finish-1',
+          routineName: 'Test',
+          startedAt: start,
+          finishedAt: finish,
+          exercises: const [],
+        );
+        expect(session.copyWith(notes: 'Done').finishedAt, finish);
+        expect(
+          session
+              .copyWith(finishedAt: start.subtract(const Duration(seconds: 1)))
+              .duration,
+          Duration.zero,
+        );
+      },
+    );
   });
 }

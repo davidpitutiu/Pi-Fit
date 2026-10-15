@@ -10,6 +10,17 @@ class Exercise {
     this.steps = const [],
     this.tips = const [],
     this.secondaryMuscles = '',
+    this.imageAsset = '',
+    this.secondaryImageAsset = '',
+    this.imageUrl = '',
+    this.secondaryImageUrl = '',
+    this.instructionLanguage = 'ro',
+    this.sourceId = '',
+    this.difficulty = 'Intermediar',
+    this.category = 'Forță',
+    this.movement = '',
+    this.sourceName = '',
+    this.aliases = const <String>[],
   });
 
   final String id;
@@ -20,6 +31,17 @@ class Exercise {
   final List<String> steps;
   final List<String> tips;
   final String secondaryMuscles;
+  final String imageAsset;
+  final String secondaryImageAsset;
+  final String imageUrl;
+  final String secondaryImageUrl;
+  final String instructionLanguage;
+  final String sourceId;
+  final String difficulty;
+  final String category;
+  final String movement;
+  final String sourceName;
+  final List<String> aliases;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -30,6 +52,17 @@ class Exercise {
     'steps': steps,
     'tips': tips,
     'secondaryMuscles': secondaryMuscles,
+    'imageAsset': imageAsset,
+    'secondaryImageAsset': secondaryImageAsset,
+    'imageUrl': imageUrl,
+    'secondaryImageUrl': secondaryImageUrl,
+    'instructionLanguage': instructionLanguage,
+    'sourceId': sourceId,
+    'difficulty': difficulty,
+    'category': category,
+    'movement': movement,
+    'sourceName': sourceName,
+    'aliases': aliases,
   };
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
@@ -41,6 +74,17 @@ class Exercise {
     steps: List<String>.from(json['steps'] as List? ?? const []),
     tips: List<String>.from(json['tips'] as List? ?? const []),
     secondaryMuscles: json['secondaryMuscles'] as String? ?? '',
+    imageAsset: json['imageAsset'] as String? ?? '',
+    secondaryImageAsset: json['secondaryImageAsset'] as String? ?? '',
+    imageUrl: json['imageUrl'] as String? ?? '',
+    secondaryImageUrl: json['secondaryImageUrl'] as String? ?? '',
+    instructionLanguage: json['instructionLanguage'] as String? ?? 'ro',
+    sourceId: json['sourceId'] as String? ?? '',
+    difficulty: json['difficulty'] as String? ?? 'Intermediar',
+    category: json['category'] as String? ?? 'Forță',
+    movement: json['movement'] as String? ?? '',
+    sourceName: json['sourceName'] as String? ?? '',
+    aliases: List<String>.from(json['aliases'] as List? ?? const []),
   );
 }
 

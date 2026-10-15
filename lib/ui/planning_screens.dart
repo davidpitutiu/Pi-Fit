@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../domain/models.dart';
+import '../domain/training_analytics.dart';
 import '../services/notification_service.dart';
 import '../state/app_store.dart';
 import 'theme.dart';
+import 'health_screen.dart';
 import 'training_screens.dart';
 
 const _months = [
@@ -882,21 +884,55 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
   }
 }
 
-class ProgressScreen extends StatelessWidget {
+class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key, required this.store});
   final AppStore store;
+
+  @override
+  State<ProgressScreen> createState() => _ProgressScreenState();
+}
+
+class _ProgressScreenState extends State<ProgressScreen> {
+  int _days = 28;
+  _TrendMetric _metric = _TrendMetric.volume;
+  String? _exerciseId;
+  bool _showEstimatedMax = false;
+  AppStore get store => widget.store;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: store,
     builder: (context, _) {
-      final history = [...store.history]
-        ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
-      final totalSets = history.fold<int>(
-        0,
-        (sum, session) => sum + session.completedSets,
+      final analytics = store.analytics;
+      final series = buildTrainingSeries(
+        history: store.history,
+        exercises: store.exercises,
+        days: _days,
+        now: analytics.asOf,
       );
-      final records = _records(history);
+      final records = analytics.records;
+      final selectedId =
+          records.any((record) => record.exerciseId == _exerciseId)
+          ? _exerciseId
+          : (records.isEmpty ? null : records.first.exerciseId);
+      final exercise = selectedId == null
+          ? null
+          : store.exerciseById(selectedId);
+      final progression = exercise == null
+          ? <ExerciseProgressPoint>[]
+          : buildExerciseProgression(
+              history: store.history,
+              exercise: exercise,
+              days: _days,
+              now: analytics.asOf,
+            );
+      final history = [
+        ...store.history.where(
+          (session) =>
+              session.finishedAt != null &&
+              !session.finishedAt!.isAfter(analytics.asOf),
+        ),
+      ]..sort((a, b) => b.startedAt.compareTo(a.startedAt));
       return Scaffold(
         appBar: AppBar(
           title: const Text(
@@ -907,192 +943,1330 @@ class ProgressScreen extends StatelessWidget {
         body: PageBody(
           children: [
             Text(
-              'Fiecare set contează.',
+              'PROGRESUL TĂU',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 2,
+                color: PiColors.muted(context),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Mai bine, în ritmul tău.',
               style: Theme.of(context).textTheme.headlineLarge,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
-              'Progresul tău, din antrenamentele finalizate.',
+              'Date reale. Obiective personale. Fiecare pas este vizibil.',
               style: TextStyle(color: PiColors.muted(context)),
             ),
             const SizedBox(height: 24),
+            _ConsistencyCard(analytics: analytics),
+            const SizedBox(height: 14),
+            _StreakCard(
+              streak: analytics.streak,
+              activeDates: series.activeDates,
+            ),
+            const SizedBox(height: 24),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final days in [7, 28, 90])
+                  ChoiceChip(
+                    key: ValueKey('period-$days'),
+                    label: Text('$days zile'),
+                    selected: _days == days,
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _days = days),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Ultimele $_days de zile',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Cum se calculează statisticile',
+                  onPressed: () => _showExplanation(
+                    context,
+                    'Despre statisticile tale',
+                    [
+                      'Intervalul selectat include ultimele $_days zile calendaristice, inclusiv azi. Sunt folosite numai sesiunile finalizate cu seturi bifate valide.',
+                      analytics.volumeExplanation,
+                      'Minutele reprezintă durata înregistrată între pornirea și finalizarea sesiunii, inclusiv pauzele.',
+                    ],
+                  ),
+                  icon: Icon(
+                    Icons.info_outline_rounded,
+                    size: 20,
+                    color: PiColors.muted(context),
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              '${formatDate(series.start)} — ${formatDate(series.asOf)}',
+              style: TextStyle(color: PiColors.muted(context), fontSize: 12),
+            ),
+            const SizedBox(height: 14),
             LayoutBuilder(
-              builder: (context, constraints) => Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 12) / 2;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _StatCard(
+                      width: width,
+                      value: '${series.workoutCount}',
+                      label: 'antrenamente salvate',
+                      icon: Icons.fitness_center_rounded,
+                    ),
+                    _StatCard(
+                      width: width,
+                      value: '${series.completedSets}',
+                      label: 'seturi completate',
+                      icon: Icons.check_circle_outline_rounded,
+                    ),
+                    _StatCard(
+                      width: width,
+                      value: _volume(series.volume),
+                      label: 'kg · volum extern',
+                      icon: Icons.monitor_weight_outlined,
+                    ),
+                    _StatCard(
+                      width: width,
+                      value: '${series.activeDays}',
+                      label: 'zile active',
+                      icon: Icons.calendar_today_rounded,
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SectionHeading(title: 'Evoluția antrenamentelor'),
+            _TrainingTrendCard(
+              series: series,
+              metric: _metric,
+              onMetric: (metric) => setState(() => _metric = metric),
+            ),
+            const SectionHeading(title: 'Mai puternic, pas cu pas'),
+            if (records.isEmpty)
+              const _PlanningEmpty(
+                icon: Icons.show_chart_rounded,
+                title: 'Primul punct de progres te așteaptă',
+                subtitle:
+                    'Salvează seturi de forță cu greutate externă. Vei putea urmări greutatea și estimarea 1RM pentru fiecare exercițiu.',
+              )
+            else
+              PiCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      key: const ValueKey('progress-exercise'),
+                      initialValue: selectedId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Exercițiu'),
+                      items: [
+                        for (final record in records)
+                          DropdownMenuItem(
+                            value: record.exerciseId,
+                            child: Text(
+                              record.exerciseName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() => _exerciseId = value),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Greutate'),
+                          selected: !_showEstimatedMax,
+                          showCheckmark: false,
+                          onSelected: (_) =>
+                              setState(() => _showEstimatedMax = false),
+                        ),
+                        ChoiceChip(
+                          label: const Text('1RM estimat'),
+                          selected: _showEstimatedMax,
+                          showCheckmark: false,
+                          onSelected: (_) =>
+                              setState(() => _showEstimatedMax = true),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    _ExerciseProgressChart(
+                      points: progression,
+                      estimated: _showEstimatedMax,
+                      start: series.start,
+                      asOf: series.asOf,
+                    ),
+                  ],
+                ),
+              ),
+            const SectionHeading(title: 'În afara sălii'),
+            PiCard(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => HealthScreen(store: store),
+                ),
+              ),
+              padding: const EdgeInsets.all(18),
+              child: Row(
                 children: [
-                  _StatCard(
-                    width: (constraints.maxWidth - 12) / 2,
-                    value: '${history.length}',
-                    label: 'antrenamente',
-                    icon: Icons.fitness_center_rounded,
+                  Icon(
+                    Icons.favorite_rounded,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                  _StatCard(
-                    width: (constraints.maxWidth - 12) / 2,
-                    value: '$totalSets',
-                    label: 'seturi completate',
-                    icon: Icons.check_circle_outline_rounded,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sănătate & mișcare',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Text(
+                          'Pași, energie și minute de mișcare',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: PiColors.muted(context),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  _StatCard(
-                    width: (constraints.maxWidth - 12) / 2,
-                    value: _volume(store.totalVolume),
-                    label: 'kg volum total',
-                    icon: Icons.monitor_weight_outlined,
-                  ),
-                  _StatCard(
-                    width: (constraints.maxWidth - 12) / 2,
-                    value: '${store.weeklyCount}',
-                    label: 'săptămâna aceasta',
-                    icon: Icons.local_fire_department_outlined,
-                  ),
+                  const Icon(Icons.chevron_right_rounded),
                 ],
               ),
             ),
-            const SectionHeading(title: 'Consecvența ta'),
-            _WeeklyChart(history: history),
-            const SectionHeading(title: 'Recorduri personale'),
-            if (records.isEmpty)
+            const SectionHeading(title: 'Unde ai lucrat'),
+            if (series.muscles.isEmpty)
+              _PlanningEmpty(
+                icon: Icons.accessibility_new_rounded,
+                title: 'Harta ta musculară prinde contur',
+                subtitle:
+                    'Seturile bifate din ultimele $_days de zile apar aici, grupate după mușchiul principal.',
+              )
+            else
+              _MuscleDistribution(muscles: series.muscles, days: _days),
+            SectionHeading(
+              title: 'Recorduri personale',
+              action: 'Despre 1RM',
+              onAction: () => _showExplanation(
+                context,
+                'Recorduri și estimări',
+                [analytics.recordsExplanation],
+              ),
+            ),
+            if (analytics.records.isEmpty)
               const _PlanningEmpty(
                 icon: Icons.emoji_events_outlined,
                 title: 'Primul record te așteaptă',
                 subtitle:
-                    'Finalizează un antrenament cu seturi bifate. Aici apar greutățile și repetările tale reale.',
+                    'Salvează un set cu greutate externă. Aici vei vedea cel mai bun set și, când este posibil, estimarea 1RM.',
               )
-            else
+            else ...[
+              Text(
+                'Tot istoricul · seturi de forță cu greutate externă',
+                style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+              ),
+              const SizedBox(height: 12),
               PiCard(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
                   vertical: 4,
                 ),
                 child: Column(
-                  children: List.generate(records.length, (index) {
-                    final record = records[index];
-                    final exercise = _exerciseName(store, record.exerciseId);
-                    return Column(
-                      children: [
-                        if (index > 0) const Divider(height: 1),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: PiColors.lime.withValues(alpha: 0.13),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  Icons.emoji_events_outlined,
-                                  size: 20,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      exercise,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      formatDate(record.date),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: PiColors.muted(context),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    record.weight > 0
-                                        ? '${_number(record.weight)} kg'
-                                        : '${record.reps} rep',
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  Text(
-                                    record.weight > 0
-                                        ? '× ${record.reps} rep'
-                                        : 'greutate corporală',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: PiColors.muted(context),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  }),
+                  children: [
+                    for (
+                      var index = 0;
+                      index < analytics.records.length;
+                      index++
+                    ) ...[
+                      if (index > 0) const Divider(height: 1),
+                      _RecordRow(record: analytics.records[index]),
+                    ],
+                  ],
                 ),
               ),
+            ],
             SectionHeading(
-              title: 'Jurnal de antrenament',
+              title: 'Jurnalul tău',
               action: history.isEmpty ? null : '${history.length} sesiuni',
+              onAction: history.isEmpty
+                  ? null
+                  : () => _openHistory(context, store, history),
             ),
             if (history.isEmpty)
-              const _PlanningEmpty(
+              _PlanningEmpty(
                 icon: Icons.history_rounded,
-                title: 'Povestea ta începe aici',
+                title: 'Înregistrează primul antrenament',
                 subtitle:
-                    'Pornește un antrenament, bifează seturile și salvează sesiunea. Jurnalul și graficele se completează automat.',
+                    'Alege o rutină, bifează seturile efectuate și salvează. Statisticile se construiesc din antrenamentele tale.',
+                action: 'Alege un antrenament',
+                onAction: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => RoutinesScreen(store: store),
+                  ),
+                ),
               ),
-            for (final session in history) ...[
+            for (final session in history.take(6)) ...[
               _HistoryCard(store: store, session: session),
               const SizedBox(height: 12),
             ],
+            if (history.length > 6)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => _openHistory(context, store, history),
+                  child: Text('Vezi toate cele ${history.length} sesiuni'),
+                ),
+              ),
           ],
         ),
       );
     },
   );
+}
 
-  List<_PersonalRecord> _records(List<WorkoutSession> history) {
-    final records = <String, _PersonalRecord>{};
-    for (final session in history) {
-      for (final exercise in session.exercises) {
-        for (final set in exercise.sets.where((set) => set.completed)) {
-          final current = records[exercise.exerciseId];
-          if (current == null ||
-              set.weight > current.weight ||
-              (set.weight == current.weight && set.reps > current.reps)) {
-            records[exercise.exerciseId] = _PersonalRecord(
-              exercise.exerciseId,
-              set.weight,
-              set.reps,
-              session.startedAt,
-            );
-          }
-        }
-      }
+void _openHistory(
+  BuildContext context,
+  AppStore store,
+  List<WorkoutSession> history,
+) => Navigator.of(context).push(
+  MaterialPageRoute<void>(
+    builder: (context) => Scaffold(
+      appBar: AppBar(title: const Text('Jurnal de antrenament')),
+      body: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 32),
+        itemCount: history.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (_, index) =>
+            _HistoryCard(store: store, session: history[index]),
+      ),
+    ),
+  ),
+);
+
+Future<void> _showExplanation(
+  BuildContext context,
+  String title,
+  List<String> paragraphs,
+) => showDialog<void>(
+  context: context,
+  builder: (context) => AlertDialog(
+    title: Text(title),
+    content: SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final paragraph in paragraphs)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Text(paragraph),
+            ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Am înțeles'),
+      ),
+    ],
+  ),
+);
+
+enum _TrendMetric {
+  volume('Volum', 'kg'),
+  sets('Seturi', 'seturi'),
+  sessions('Sesiuni', 'sesiuni'),
+  minutes('Minute', 'min');
+
+  const _TrendMetric(this.label, this.unit);
+  final String label;
+  final String unit;
+
+  double daily(DailyTrainingActivity point) => switch (this) {
+    volume => point.volume,
+    sets => point.completedSets.toDouble(),
+    sessions => point.workoutCount.toDouble(),
+    minutes => point.durationMinutes,
+  };
+
+  double total(TrainingSeries series) => switch (this) {
+    volume => series.volume,
+    sets => series.completedSets.toDouble(),
+    sessions => series.workoutCount.toDouble(),
+    minutes => series.durationMinutes,
+  };
+}
+
+class _TrendBin {
+  const _TrendBin(this.start, this.end, this.value);
+  final DateTime start;
+  final DateTime end;
+  final double value;
+
+  String get dateLabel => _sameDay(start, end)
+      ? formatDate(start)
+      : '${formatDate(start)} — ${formatDate(end)}';
+}
+
+class _TrainingTrendCard extends StatefulWidget {
+  const _TrainingTrendCard({
+    required this.series,
+    required this.metric,
+    required this.onMetric,
+  });
+  final TrainingSeries series;
+  final _TrendMetric metric;
+  final ValueChanged<_TrendMetric> onMetric;
+
+  @override
+  State<_TrainingTrendCard> createState() => _TrainingTrendCardState();
+}
+
+class _TrainingTrendCardState extends State<_TrainingTrendCard> {
+  int? _selected;
+
+  @override
+  void didUpdateWidget(covariant _TrainingTrendCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.series.days != widget.series.days ||
+        oldWidget.metric != widget.metric) {
+      _selected = null;
     }
-    return records.values.toList()..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final points = widget.series.points;
+    final binSize = widget.series.days == 7 ? 1 : 7;
+    final bins = <_TrendBin>[];
+    for (var index = 0; index < points.length; index += binSize) {
+      final values = points.skip(index).take(binSize).toList();
+      bins.add(
+        _TrendBin(
+          values.first.date,
+          values.last.date,
+          values.fold(0, (total, day) => total + widget.metric.daily(day)),
+        ),
+      );
+    }
+    final maxValue = math.max(
+      1.0,
+      bins.fold<double>(0, (value, bin) => math.max(value, bin.value)),
+    );
+    var selected = _selected ?? bins.lastIndexWhere((bin) => bin.value > 0);
+    if (selected < 0 || selected >= bins.length) selected = bins.length - 1;
+    final unit = widget.metric.unit;
+    return PiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              for (final metric in _TrendMetric.values)
+                ChoiceChip(
+                  key: ValueKey('metric-${metric.name}'),
+                  label: Text(metric.label),
+                  selected: widget.metric == metric,
+                  showCheckmark: false,
+                  onSelected: (_) => widget.onMetric(metric),
+                ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _number(widget.metric.total(widget.series)),
+                    key: const ValueKey('trend-total'),
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  unit,
+                  style: TextStyle(color: PiColors.muted(context)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'în ultimele ${widget.series.days} zile',
+            style: TextStyle(color: PiColors.muted(context), fontSize: 12),
+          ),
+          if (widget.series.workoutCount == 0) ...[
+            const SizedBox(height: 28),
+            const _ChartEmpty(
+              message:
+                  'Nicio sesiune finalizată în acest interval. Următorul antrenament va deveni primul punct de pe grafic.',
+            ),
+          ] else ...[
+            const SizedBox(height: 24),
+            Text(
+              '${bins[selected].dateLabel} · ${_number(bins[selected].value)} $unit',
+              key: const ValueKey('trend-selected'),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 142,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (var index = 0; index < bins.length; index++)
+                    Expanded(
+                      child: Semantics(
+                        label:
+                            '${bins[index].dateLabel}: ${_number(bins[index].value)} $unit',
+                        button: true,
+                        selected: selected == index,
+                        child: Tooltip(
+                          message:
+                              '${bins[index].dateLabel}: ${_number(bins[index].value)} $unit',
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () => setState(() => _selected = index),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 3,
+                              ),
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Container(
+                                  height: math.max(
+                                    3,
+                                    136 * bins[index].value / maxValue,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(9),
+                                    color: bins[index].value == 0
+                                        ? Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: .08)
+                                        : null,
+                                    gradient: bins[index].value == 0
+                                        ? null
+                                        : LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              PiColors.lime.withValues(
+                                                alpha: selected == index
+                                                    ? 1
+                                                    : .65,
+                                              ),
+                                              PiColors.lime.withValues(
+                                                alpha: selected == index
+                                                    ? .38
+                                                    : .15,
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(
+                  '${points.first.date.day}/${points.first.date.month}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: PiColors.muted(context),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${points.last.date.day}/${points.last.date.month}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: PiColors.muted(context),
+                  ),
+                ),
+              ],
+            ),
+            if (bins.length > 1)
+              Slider(
+                key: const ValueKey('trend-slider'),
+                value: selected.toDouble(),
+                min: 0,
+                max: (bins.length - 1).toDouble(),
+                divisions: bins.length - 1,
+                semanticFormatterCallback: (value) {
+                  final bin = bins[value.round()];
+                  return '${bin.dateLabel}: ${_number(bin.value)} $unit';
+                },
+                onChanged: (value) => setState(() => _selected = value.round()),
+              ),
+            Text(
+              binSize == 1
+                  ? 'Fiecare bară reprezintă o zi.'
+                  : 'Bare de câte 7 zile; ultima poate fi un interval mai scurt.',
+              style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  useSafeArea: true,
+                  isScrollControlled: true,
+                  builder: (context) => SizedBox(
+                    height: MediaQuery.sizeOf(context).height * .7,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(22, 0, 22, 14),
+                          child: Text(
+                            '${widget.metric.label} · valorile graficului',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        Expanded(
+                          child: ListView.separated(
+                            itemCount: bins.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1),
+                            itemBuilder: (_, index) => ListTile(
+                              title: Text(bins[index].dateLabel),
+                              subtitle: Text(
+                                '${_number(bins[index].value)} $unit',
+                              ),
+                              onTap: () {
+                                setState(() => _selected = index);
+                                Navigator.pop(context);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.table_rows_outlined, size: 17),
+                label: const Text('Vezi valorile'),
+              ),
+            ),
+          ],
+          if (widget.metric == _TrendMetric.minutes)
+            Text(
+              'Durata înregistrată a sesiunilor, inclusiv pauzele.',
+              style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+            ),
+        ],
+      ),
+    );
   }
 }
 
-class _PersonalRecord {
-  const _PersonalRecord(this.exerciseId, this.weight, this.reps, this.date);
-  final String exerciseId;
-  final double weight;
-  final int reps;
-  final DateTime date;
+class _ChartEmpty extends StatelessWidget {
+  const _ChartEmpty({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: Column(
+      children: [
+        Icon(
+          Icons.show_chart_rounded,
+          size: 36,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.5,
+            color: PiColors.muted(context),
+          ),
+        ),
+      ],
+    ),
+  );
 }
+
+class _StreakCard extends StatelessWidget {
+  const _StreakCard({required this.streak, required this.activeDates});
+  final TrainingStreak streak;
+  final List<DateTime> activeDates;
+
+  @override
+  Widget build(BuildContext context) => PiCard(
+    onTap: () => _showExplanation(context, 'Cum funcționează seria', [
+      streak.explanation,
+      'Obiectivul curent: ${streak.targetDaysPerWeek} zile active pe săptămână. Îl poți modifica din Cont → Profil.',
+    ]),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.local_fire_department_rounded,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'Revii. Construiești. Repeți.',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.info_outline_rounded,
+              size: 18,
+              color: PiColors.muted(context),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _StreakMetric(
+                value: streak.currentWeeks,
+                label: 'săptămâni la rând',
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _StreakMetric(
+                value: streak.bestWeeks,
+                label: 'cea mai bună serie',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Săptămâna aceasta · ${streak.activeDaysThisWeek} / ${streak.targetDaysPerWeek} zile',
+          style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            for (var index = 0; index < 7; index++)
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    final day = DateTime(
+                      streak.currentWeekStart.year,
+                      streak.currentWeekStart.month,
+                      streak.currentWeekStart.day + index,
+                    );
+                    final active = activeDates.any(
+                      (date) => _sameDay(date, day),
+                    );
+                    return Semantics(
+                      label:
+                          '${_fullWeekdays[index]}, ${formatDate(day)}: ${active ? 'antrenament înregistrat' : 'fără antrenament înregistrat'}',
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 25,
+                            height: 25,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: active
+                                  ? PiColors.lime
+                                  : Theme.of(context).colorScheme.onSurface
+                                        .withValues(alpha: .06),
+                            ),
+                            child: active
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    color: Color(0xFF182000),
+                                    size: 17,
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            _weekdays[index],
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: PiColors.muted(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            minHeight: 5,
+            value: math.min(
+              1,
+              streak.activeDaysThisWeek / streak.targetDaysPerWeek,
+            ),
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: .07),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _StreakMetric extends StatelessWidget {
+  const _StreakMetric({required this.value, required this.label});
+  final int value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('$value', style: Theme.of(context).textTheme.headlineLarge),
+      const SizedBox(height: 5),
+      Text(
+        label,
+        style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+      ),
+    ],
+  );
+}
+
+class _ChartPoint {
+  const _ChartPoint(this.date, this.value, this.description);
+  final DateTime date;
+  final double value;
+  final String description;
+}
+
+class _ExerciseProgressChart extends StatefulWidget {
+  const _ExerciseProgressChart({
+    required this.points,
+    required this.estimated,
+    required this.start,
+    required this.asOf,
+  });
+  final List<ExerciseProgressPoint> points;
+  final bool estimated;
+  final DateTime start;
+  final DateTime asOf;
+
+  @override
+  State<_ExerciseProgressChart> createState() => _ExerciseProgressChartState();
+}
+
+class _ExerciseProgressChartState extends State<_ExerciseProgressChart> {
+  int? _selected;
+
+  @override
+  void didUpdateWidget(covariant _ExerciseProgressChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.estimated != widget.estimated ||
+        oldWidget.points != widget.points) {
+      _selected = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final points = <_ChartPoint>[
+      for (final point in widget.points)
+        if (!widget.estimated || point.estimatedOneRepMax != null)
+          _ChartPoint(
+            point.date,
+            widget.estimated ? point.estimatedOneRepMax! : point.topWeight,
+            widget.estimated
+                ? '1RM estimat'
+                : '${_number(point.topWeight)} kg × ${point.topWeightReps}',
+          ),
+    ];
+    if (points.isEmpty) {
+      return _ChartEmpty(
+        message: widget.estimated
+            ? 'Nu există seturi eligibile de 1–12 repetări în acest interval. Alege Greutate sau o perioadă mai lungă.'
+            : 'Niciun set pentru acest exercițiu în intervalul selectat. Alege alt exercițiu sau o perioadă mai lungă.',
+      );
+    }
+    final selected = (_selected ?? points.length - 1).clamp(
+      0,
+      points.length - 1,
+    );
+    final point = points[selected];
+    final delta = points.last.value - points.first.value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 9,
+          children: [
+            Text(
+              '${_number(point.value)} kg',
+              key: const ValueKey('exercise-chart-value'),
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            Text(
+              widget.estimated ? '1RM estimat' : 'greutate externă',
+              style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '${formatDate(point.date)} · ${point.description}',
+          key: const ValueKey('exercise-chart-selected'),
+          style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+        ),
+        const SizedBox(height: 22),
+        Semantics(
+          label:
+              'Grafic cu ${points.length} zile înregistrate. ${points.map((point) => '${formatDate(point.date)}: ${_number(point.value)} kg').join('; ')}',
+          child: SizedBox(
+            height: 150,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: _ProgressLinePainter(
+                points: points,
+                start: widget.start,
+                asOf: widget.asOf,
+                selected: selected,
+                color: Theme.of(context).colorScheme.primary,
+                grid: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: .07),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Text(
+              '${widget.start.day}/${widget.start.month}',
+              style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+            ),
+            const Spacer(),
+            Text(
+              '${widget.asOf.day}/${widget.asOf.month}',
+              style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+            ),
+          ],
+        ),
+        if (points.length > 1) ...[
+          Slider(
+            key: const ValueKey('exercise-progress-slider'),
+            min: 0,
+            max: (points.length - 1).toDouble(),
+            divisions: points.length - 1,
+            value: selected.toDouble(),
+            semanticFormatterCallback: (value) =>
+                '${formatDate(points[value.round()].date)}: ${_number(points[value.round()].value)} kg',
+            onChanged: (value) => setState(() => _selected = value.round()),
+          ),
+          Text(
+            '${delta > 0 ? '+' : ''}${_number(delta)} kg între prima și ultima zi înregistrată din interval.',
+            style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+          ),
+        ] else ...[
+          const SizedBox(height: 14),
+          Text(
+            'O zi înregistrată. Următoarea sesiune va arăta o evoluție.',
+            style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text(
+          widget.estimated
+              ? 'Epley, numai seturi de 1–12 repetări. Estimarea nu este o greutate recomandată.'
+              : 'Cel mai greu set bifat din fiecare zi. Repetările pot fi diferite.',
+          style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Punctele sunt zile înregistrate; zilele fără date nu sunt completate cu valori inventate.',
+          style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProgressLinePainter extends CustomPainter {
+  const _ProgressLinePainter({
+    required this.points,
+    required this.start,
+    required this.asOf,
+    required this.selected,
+    required this.color,
+    required this.grid,
+  });
+  final List<_ChartPoint> points;
+  final DateTime start;
+  final DateTime asOf;
+  final int selected;
+  final Color color;
+  final Color grid;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const inset = 8.0;
+    final plot = Rect.fromLTRB(
+      inset,
+      inset,
+      size.width - inset,
+      size.height - inset,
+    );
+    final gridPaint = Paint()
+      ..color = grid
+      ..strokeWidth = 1;
+    for (var index = 0; index <= 3; index++) {
+      final y = plot.top + plot.height * index / 3;
+      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), gridPaint);
+    }
+    final highest = points.fold<double>(
+      1,
+      (value, point) => math.max(value, point.value),
+    );
+    final span = math.max(
+      1,
+      DateTime.utc(
+        asOf.year,
+        asOf.month,
+        asOf.day,
+      ).difference(DateTime.utc(start.year, start.month, start.day)).inDays,
+    );
+    final positions = points
+        .map(
+          (point) => Offset(
+            plot.left +
+                plot.width *
+                    DateTime.utc(
+                          point.date.year,
+                          point.date.month,
+                          point.date.day,
+                        )
+                        .difference(
+                          DateTime.utc(start.year, start.month, start.day),
+                        )
+                        .inDays /
+                    span,
+            plot.bottom - plot.height * point.value / (highest * 1.12),
+          ),
+        )
+        .toList();
+    final line = Path()..moveTo(positions.first.dx, positions.first.dy);
+    for (final position in positions.skip(1)) {
+      line.lineTo(position.dx, position.dy);
+    }
+    if (positions.length > 1) {
+      final area = Path.from(line)
+        ..lineTo(positions.last.dx, plot.bottom)
+        ..lineTo(positions.first.dx, plot.bottom)
+        ..close();
+      canvas.drawPath(
+        area,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [color.withValues(alpha: .2), color.withValues(alpha: 0)],
+          ).createShader(plot),
+      );
+      canvas.drawPath(
+        line,
+        Paint()
+          ..color = color
+          ..strokeWidth = 2.5
+          ..style = PaintingStyle.stroke
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+    for (var index = 0; index < positions.length; index++) {
+      if (index == selected) {
+        canvas.drawCircle(
+          positions[index],
+          9,
+          Paint()..color = color.withValues(alpha: .15),
+        );
+      }
+      canvas.drawCircle(
+        positions[index],
+        index == selected ? 4.5 : 3,
+        Paint()..color = color,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProgressLinePainter oldDelegate) =>
+      oldDelegate.points != points ||
+      oldDelegate.selected != selected ||
+      oldDelegate.color != color ||
+      oldDelegate.grid != grid ||
+      oldDelegate.start != start ||
+      oldDelegate.asOf != asOf;
+}
+
+class _ConsistencyCard extends StatelessWidget {
+  const _ConsistencyCard({required this.analytics});
+  final TrainingAnalytics analytics;
+
+  @override
+  Widget build(BuildContext context) => PiCard(
+    onTap: () => _showScoreDetails(context, analytics),
+    padding: const EdgeInsets.all(22),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Scor de consecvență',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_outward_rounded,
+              size: 19,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final details = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  analytics.score == null
+                      ? 'Aici începe ritmul tău.'
+                      : '${analytics.activeDaysLast28} / ${analytics.targetDaysLast28} zile active',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  analytics.score == null
+                      ? 'Scorul apare după primul antrenament salvat cu seturi bifate.'
+                      : 'Obiectivul tău: ${analytics.targetSessionsPerWeek} zile de antrenament pe săptămână.',
+                  style: TextStyle(
+                    color: PiColors.muted(context),
+                    fontSize: 12,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Vezi calculul complet',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ],
+            );
+            if (constraints.maxWidth < 300) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: _ScoreRing(score: analytics.score)),
+                  const SizedBox(height: 20),
+                  details,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                _ScoreRing(score: analytics.score),
+                const SizedBox(width: 24),
+                Expanded(child: details),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+        Divider(height: 1, color: Theme.of(context).dividerColor),
+        const SizedBox(height: 14),
+        Text(
+          'Consecvență față de obiectivul tău, în ultimele 28 de zile.',
+          style: TextStyle(color: PiColors.muted(context), fontSize: 11),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ScoreRing extends StatelessWidget {
+  const _ScoreRing({required this.score});
+  final double? score;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: score == null
+        ? 'Scor indisponibil. Înregistrează primul antrenament.'
+        : 'Scor de consecvență ${score!.round()} din 100.',
+    child: SizedBox(
+      width: 136,
+      height: 136,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 130,
+            height: 130,
+            child: CircularProgressIndicator(
+              value: (score ?? 0) / 100,
+              strokeWidth: 8,
+              strokeCap: StrokeCap.round,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: .07),
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          ExcludeSemantics(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  score == null ? '—' : '${score!.round()}',
+                  style: TextStyle(
+                    fontSize: 39,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -2,
+                    height: 1.1,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  score == null ? 'fără date' : 'din 100',
+                  style: TextStyle(
+                    color: PiColors.muted(context),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _showScoreDetails(
+  BuildContext context,
+  TrainingAnalytics analytics,
+) => showDialog<void>(
+  context: context,
+  builder: (context) => AlertDialog(
+    title: const Text('Cum se calculează scorul'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(analytics.scoreExplanation),
+          const SizedBox(height: 18),
+          for (final component in analytics.components) ...[
+            Text(
+              component.label,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '${component.value} / ${component.target} · ${_number(component.points)} din ${_number(component.maxPoints)} puncte',
+              key: ValueKey('score-component-${component.maxPoints.toInt()}'),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              component.explanation,
+              style: TextStyle(color: PiColors.muted(context), fontSize: 12),
+            ),
+            const SizedBox(height: 18),
+          ],
+          const Divider(),
+          Text(analytics.formula, style: const TextStyle(fontSize: 12)),
+          const SizedBox(height: 14),
+          Text(
+            analytics.windowExplanation,
+            style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+          ),
+          if (analytics.score == null) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'Nu există încă date pentru un scor. Salvează primul antrenament cu cel puțin un set bifat.',
+            ),
+          ],
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Am înțeles'),
+      ),
+    ],
+  ),
+);
 
 class _StatCard extends StatelessWidget {
   const _StatCard({
@@ -1110,11 +2284,11 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     width: width,
     child: PiCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 21, color: Theme.of(context).colorScheme.primary),
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 18),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -1123,7 +2297,7 @@ class _StatCard extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineLarge,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             label,
             style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
@@ -1134,131 +2308,154 @@ class _StatCard extends StatelessWidget {
   );
 }
 
-class _WeeklyChart extends StatelessWidget {
-  const _WeeklyChart({required this.history});
-  final List<WorkoutSession> history;
+class _MuscleDistribution extends StatelessWidget {
+  const _MuscleDistribution({
+    required this.muscles,
+    this.expanded = false,
+    this.days = 28,
+  });
+  final List<MuscleVolume> muscles;
+  final bool expanded;
+  final int days;
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final monday = DateTime(now.year, now.month, now.day - now.weekday + 1);
-    final starts = List.generate(
-      8,
-      (index) => monday.subtract(Duration(days: (7 - index) * 7)),
+    final total = muscles.fold<int>(
+      0,
+      (value, muscle) => value + muscle.completedSets,
     );
-    final counts = starts
-        .map(
-          (start) => history
-              .where(
-                (session) =>
-                    !session.startedAt.isBefore(start) &&
-                    session.startedAt.isBefore(
-                      start.add(const Duration(days: 7)),
-                    ),
-              )
-              .length,
-        )
-        .toList();
-    final maxValue = math.max(1, counts.fold<int>(0, math.max));
-    final total = counts.fold<int>(0, (sum, count) => sum + count);
+    final visible = expanded ? muscles : muscles.take(6);
     return PiCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$total antrenamente',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Ultimele 8 săptămâni',
-                      style: TextStyle(
-                        color: PiColors.muted(context),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.bar_chart_rounded,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ],
+          Text(
+            'Seturi pe grupa principală',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 26),
-          SizedBox(
-            height: 172,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(8, (index) {
-                final count = counts[index];
-                return Expanded(
-                  child: Semantics(
-                    label:
-                        'Săptămâna ${formatDate(starts[index])}: $count antrenamente',
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            '$count',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: PiColors.muted(context),
-                            ),
+          const SizedBox(height: 6),
+          Text(
+            'Ultimele $days de zile · fără dublarea grupelor secundare',
+            style: TextStyle(color: PiColors.muted(context), fontSize: 11),
+          ),
+          const SizedBox(height: 20),
+          for (final muscle in visible)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          muscle.muscle,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
                           ),
-                          const SizedBox(height: 7),
-                          Container(
-                            height: count == 0 ? 3 : 100 * count / maxValue,
-                            width: 25,
-                            decoration: BoxDecoration(
-                              color: count == 0
-                                  ? Theme.of(context).colorScheme.onSurface
-                                        .withValues(alpha: 0.1)
-                                  : PiColors.lime.withValues(
-                                      alpha: index == 7 ? 1 : 0.45,
-                                    ),
-                              borderRadius: BorderRadius.circular(7),
-                            ),
-                          ),
-                          const SizedBox(height: 9),
-                          Text(
-                            '${starts[index].day}/${starts[index].month}',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: PiColors.muted(context),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${muscle.completedSets} ${muscle.completedSets == 1 ? 'set' : 'seturi'}',
+                        style: TextStyle(
+                          color: PiColors.muted(context),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 9),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: total == 0 ? 0 : muscle.completedSets / total,
+                      minHeight: 6,
+                      color: Theme.of(context).colorScheme.primary,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: .06),
                     ),
                   ),
-                );
-              }),
-            ),
-          ),
-          if (total == 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                'Fără sesiuni finalizate în această perioadă.',
-                style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+                ],
               ),
+            ),
+          if (!expanded && muscles.length > 6)
+            TextButton(
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
+                  child: _MuscleDistribution(
+                    muscles: muscles,
+                    expanded: true,
+                    days: days,
+                  ),
+                ),
+              ),
+              child: Text('Vezi toate cele ${muscles.length} grupe'),
             ),
         ],
       ),
     );
   }
+}
+
+class _RecordRow extends StatelessWidget {
+  const _RecordRow({required this.record});
+  final ExerciseRecord record;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.emoji_events_outlined,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                record.exerciseName,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
+          children: [
+            Text(
+              '${_number(record.weight)} kg × ${record.reps}',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+            ),
+            if (record.estimatedOneRepMax != null)
+              Text(
+                '1RM estimat · ${_number(record.estimatedOneRepMax!)} kg',
+                style: TextStyle(color: PiColors.muted(context), fontSize: 12),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          formatDate(record.date),
+          style: TextStyle(color: PiColors.muted(context), fontSize: 11),
+        ),
+      ],
+    ),
+  );
 }
 
 String _exerciseName(AppStore store, String id) {
@@ -1276,67 +2473,82 @@ class _HistoryCard extends StatelessWidget {
   final WorkoutSession session;
 
   @override
-  Widget build(BuildContext context) => PiCard(
-    onTap: () => showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      builder: (_) => _SessionDetails(store: store, session: session),
-    ),
-    padding: const EdgeInsets.all(18),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${formatDate(session.startedAt)} · ${formatTime(session.startedAt)}',
-                style: TextStyle(color: PiColors.muted(context), fontSize: 11),
+  Widget build(BuildContext context) {
+    final metrics = _sessionAnalytics(store, session);
+    return PiCard(
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
+        builder: (_) => _SessionDetails(store: store, session: session),
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${formatDate(session.startedAt)} · ${formatTime(session.startedAt)}',
+                  style: TextStyle(
+                    color: PiColors.muted(context),
+                    fontSize: 11,
+                  ),
+                ),
               ),
-            ),
-            Icon(
-              Icons.check_circle_rounded,
-              color: Theme.of(context).colorScheme.primary,
-              size: 18,
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          session.routineName,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: Wrap(
-                spacing: 14,
-                runSpacing: 6,
-                children: [
-                  _InlineMetric(
-                    icon: Icons.schedule_rounded,
-                    label: '${session.duration.inMinutes} min',
-                  ),
-                  _InlineMetric(
-                    icon: Icons.check_rounded,
-                    label: '${session.completedSets} seturi',
-                  ),
-                  _InlineMetric(
-                    icon: Icons.fitness_center_rounded,
-                    label: '${_volume(session.volume)} kg',
-                  ),
-                ],
+              Icon(
+                Icons.check_circle_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 18,
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded, size: 21),
-          ],
-        ),
-      ],
-    ),
-  );
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            session.routineName,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 14,
+                  runSpacing: 6,
+                  children: [
+                    _InlineMetric(
+                      icon: Icons.schedule_rounded,
+                      label: '${session.duration.inMinutes} min',
+                    ),
+                    _InlineMetric(
+                      icon: Icons.check_rounded,
+                      label:
+                          '${metrics.completedSetsLast28} / ${session.totalSets} seturi',
+                    ),
+                    _InlineMetric(
+                      icon: Icons.fitness_center_rounded,
+                      label: '${_volume(metrics.volumeLast28)} kg extern',
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, size: 21),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+TrainingAnalytics _sessionAnalytics(AppStore store, WorkoutSession session) =>
+    analyzeTraining(
+      history: [session],
+      exercises: store.exercises,
+      profile: store.profile,
+      now: session.finishedAt,
+    );
 
 class _InlineMetric extends StatelessWidget {
   const _InlineMetric({required this.icon, required this.label});
@@ -1348,9 +2560,11 @@ class _InlineMetric extends StatelessWidget {
     children: [
       Icon(icon, size: 13, color: PiColors.muted(context)),
       const SizedBox(width: 4),
-      Text(
-        label,
-        style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+      Flexible(
+        child: Text(
+          label,
+          style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+        ),
       ),
     ],
   );
@@ -1362,151 +2576,195 @@ class _SessionDetails extends StatelessWidget {
   final WorkoutSession session;
 
   @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-    ),
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(22, 4, 22, 30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            session.routineName,
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${formatDate(session.startedAt)} · ${formatTime(session.startedAt)}',
-            style: TextStyle(color: PiColors.muted(context)),
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 18,
-            runSpacing: 10,
-            children: [
-              _InlineMetric(
-                icon: Icons.schedule_rounded,
-                label:
-                    '${session.duration.inMinutes} min ${session.duration.inSeconds % 60} sec',
-              ),
-              _InlineMetric(
-                icon: Icons.check_circle_outline_rounded,
-                label: '${session.completedSets} / ${session.totalSets} seturi',
-              ),
-              _InlineMetric(
-                icon: Icons.fitness_center_rounded,
-                label: '${_volume(session.volume)} kg volum',
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          for (final exercise in session.exercises) ...[
-            PiCard(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _exerciseName(store, exercise.exerciseId),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 42,
-                        child: Text(
-                          'SET',
+  Widget build(BuildContext context) {
+    final metrics = _sessionAnalytics(store, session);
+    final estimates = {
+      for (final record in metrics.records)
+        record.exerciseId: record.estimatedOneRepMax,
+    };
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(22, 4, 22, 30),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              session.routineName,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${formatDate(session.startedAt)} · ${formatTime(session.startedAt)}',
+              style: TextStyle(color: PiColors.muted(context)),
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 18,
+              runSpacing: 10,
+              children: [
+                _InlineMetric(
+                  icon: Icons.schedule_rounded,
+                  label:
+                      '${session.duration.inMinutes} min ${session.duration.inSeconds % 60} sec',
+                ),
+                _InlineMetric(
+                  icon: Icons.check_circle_outline_rounded,
+                  label:
+                      '${metrics.completedSetsLast28} / ${session.totalSets} seturi',
+                ),
+                _InlineMetric(
+                  icon: Icons.fitness_center_rounded,
+                  label: '${_volume(metrics.volumeLast28)} kg volum extern',
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Statisticile folosesc seturile bifate cu valori valide. Seturile nebifate arată ce era planificat.',
+              style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+            ),
+            const SizedBox(height: 20),
+            for (final exercise in session.exercises) ...[
+              PiCard(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _exerciseName(store, exercise.exerciseId),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 42,
+                          child: Text(
+                            'SET',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: PiColors.muted(context),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'GREUTATE × REP',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: PiColors.muted(context),
+                            ),
+                          ),
+                        ),
+                        Text(
+                          'STATUS',
                           style: TextStyle(
                             fontSize: 10,
                             color: PiColors.muted(context),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'GREUTATE × REP',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: PiColors.muted(context),
-                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    for (var index = 0; index < exercise.sets.length; index++)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 7),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 42,
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  color: PiColors.muted(context),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '${exercise.sets[index].weight == 0 ? 'Corp' : '${_number(exercise.sets[index].weight)} kg'} × ${exercise.sets[index].reps}',
+                                style: TextStyle(
+                                  fontWeight: exercise.sets[index].completed
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                  color: exercise.sets[index].completed
+                                      ? null
+                                      : PiColors.muted(context),
+                                ),
+                              ),
+                            ),
+                            Tooltip(
+                              message: exercise.sets[index].completed
+                                  ? 'Set completat'
+                                  : 'Set planificat, neefectuat',
+                              child: Icon(
+                                exercise.sets[index].completed
+                                    ? Icons.check_circle_rounded
+                                    : Icons.remove_circle_outline_rounded,
+                                semanticLabel: exercise.sets[index].completed
+                                    ? 'Completat'
+                                    : 'Planificat, neefectuat',
+                                color: exercise.sets[index].completed
+                                    ? Theme.of(context).colorScheme.primary
+                                    : PiColors.muted(context),
+                                size: 19,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                    if (estimates[exercise.exerciseId] != null) ...[
+                      const SizedBox(height: 12),
+                      const Divider(),
+                      const SizedBox(height: 8),
                       Text(
-                        'STATUS',
+                        '1RM estimat · ${_number(estimates[exercise.exerciseId]!)} kg',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Epley · din cel mai bun set bifat eligibil (1–12 repetări).',
+                        style: TextStyle(
+                          fontSize: 11,
                           color: PiColors.muted(context),
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                  for (var index = 0; index < exercise.sets.length; index++)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 7),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 42,
-                            child: Text(
-                              '${index + 1}',
-                              style: TextStyle(color: PiColors.muted(context)),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              '${exercise.sets[index].weight == 0 ? 'Corp' : '${_number(exercise.sets[index].weight)} kg'} × ${exercise.sets[index].reps}',
-                              style: TextStyle(
-                                fontWeight: exercise.sets[index].completed
-                                    ? FontWeight.w700
-                                    : FontWeight.w400,
-                                color: exercise.sets[index].completed
-                                    ? null
-                                    : PiColors.muted(context),
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            exercise.sets[index].completed
-                                ? Icons.check_circle_rounded
-                                : Icons.remove_circle_outline_rounded,
-                            color: exercise.sets[index].completed
-                                ? Theme.of(context).colorScheme.primary
-                                : PiColors.muted(context),
-                            size: 19,
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+            ],
+            if (session.notes.trim().isNotEmpty) ...[
+              const SectionHeading(title: 'Notițele tale'),
+              PiCard(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Text(session.notes),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
-          ],
-          if (session.notes.trim().isNotEmpty) ...[
-            const SectionHeading(title: 'Notițele tale'),
-            PiCard(
-              child: SizedBox(
-                width: double.infinity,
-                child: Text(session.notes),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Închide'),
               ),
             ),
           ],
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Închide'),
-            ),
-          ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _PlanningEmpty extends StatelessWidget {
