@@ -23,6 +23,7 @@ class HomeScreen extends StatelessWidget {
       if (context.mounted) {
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
+            settings: const RouteSettings(name: '/workout'),
             builder: (_) => ActiveWorkoutScreen(store: store),
           ),
         );
@@ -61,10 +62,10 @@ class HomeScreen extends StatelessWidget {
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
           final greeting = now.hour < 12
-              ? 'Bună dimineața'
+              ? 'Good morning'
               : now.hour < 18
-              ? 'Bună ziua'
-              : 'Bună seara';
+              ? 'Good afternoon'
+              : 'Good evening';
           final user = auth.data ?? FirebaseGateway.instance.currentUser;
           final heroExercise = store.exerciseById(
             nextRoutine?.exercises.firstOrNull?.exerciseId ?? 'deadlift',
@@ -132,7 +133,7 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(width: 3),
                   Semantics(
                     button: true,
-                    label: 'Deschide profilul',
+                    label: 'Open profile',
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
                       onTap: () => onNavigate(4),
@@ -171,7 +172,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 7),
                         Text(
-                          'Mișcare cu sens.',
+                          'Move with purpose.',
                           style: Theme.of(context).textTheme.headlineLarge
                               ?.copyWith(fontSize: narrow ? 28 : 32),
                         ),
@@ -206,7 +207,7 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                         Text(
-                          'zile · săptămâna asta',
+                          'days this week',
                           style: TextStyle(
                             fontSize: 8,
                             color: PiColors.muted(context),
@@ -255,7 +256,7 @@ class HomeScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Progresul tău merită un cont.',
+                              'Your progress deserves a home.',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -263,7 +264,7 @@ class HomeScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              'Login, profil și backup într-un singur loc.',
+                              'Your profile and backup, together.',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: PiColors.muted(context),
@@ -273,7 +274,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Login sau cont nou',
+                        tooltip: 'Sign in or create an account',
                         onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => AuthScreen(store: store),
@@ -302,7 +303,7 @@ class HomeScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       const Expanded(
                         child: Text(
-                          'Cont conectat · gestionează profilul și backupul',
+                          'Signed in · manage profile and backups',
                           style: TextStyle(fontSize: 11),
                         ),
                       ),
@@ -311,8 +312,8 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               SectionHeading(
-                title: 'Consecvența ta',
-                action: 'Detalii',
+                title: 'Your consistency',
+                action: 'Details',
                 onAction: () => onNavigate(2),
               ),
               PiCard(
@@ -348,7 +349,9 @@ class HomeScreen extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                score.score == null ? 'Primul pas' : 'din 100',
+                                score.score == null
+                                    ? 'First step'
+                                    : 'out of 100',
                                 style: TextStyle(
                                   fontSize: 9,
                                   color: PiColors.muted(context),
@@ -366,8 +369,8 @@ class HomeScreen extends StatelessWidget {
                         children: [
                           Text(
                             score.score == null
-                                ? 'Începe în ritmul tău.'
-                                : 'Un obicei, construit de tine.',
+                                ? 'Start at your own pace.'
+                                : 'A habit, built by you.',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -377,8 +380,8 @@ class HomeScreen extends StatelessWidget {
                           const SizedBox(height: 7),
                           Text(
                             score.score == null
-                                ? 'Primul antrenament salvat va porni statisticile tale.'
-                                : '${score.activeDaysLast28} zile active din ${score.targetDaysLast28} propuse, în ultimele 28 de zile.',
+                                ? 'Save your first workout to start tracking your progress.'
+                                : '${score.activeDaysLast28} active days out of ${score.targetDaysLast28} planned over the last 28 days.',
                             style: TextStyle(
                               fontSize: 11,
                               height: 1.55,
@@ -387,7 +390,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Cum se calculează  ↗',
+                            'How it is calculated  ↗',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -411,7 +414,7 @@ class HomeScreen extends StatelessWidget {
                     Expanded(
                       child: _Stat(
                         value: score.workoutCountLast28.toString(),
-                        label: 'sesiuni · 28 zile',
+                        label: 'sessions · 28 days',
                       ),
                     ),
                     Container(
@@ -422,7 +425,7 @@ class HomeScreen extends StatelessWidget {
                     Expanded(
                       child: _Stat(
                         value: score.completedSetsLast28.toString(),
-                        label: 'seturi finalizate',
+                        label: 'completed sets',
                       ),
                     ),
                     Container(
@@ -435,14 +438,14 @@ class HomeScreen extends StatelessWidget {
                         value: score.volumeLast28 >= 1000
                             ? '${(score.volumeLast28 / 1000).toStringAsFixed(1)} t'
                             : '${score.volumeLast28.toStringAsFixed(0)} kg',
-                        label: 'volum extern',
+                        label: 'external volume',
                       ),
                     ),
                   ],
                 ),
               ),
               SectionHeading(
-                title: 'Săptămâna ta',
+                title: 'Your week',
                 action: 'Calendar',
                 onAction: () => onNavigate(3),
               ),
@@ -475,7 +478,7 @@ class HomeScreen extends StatelessWidget {
                     return Column(
                       children: [
                         Text(
-                          const ['L', 'M', 'M', 'J', 'V', 'S', 'D'][i],
+                          const ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i],
                           style: TextStyle(
                             fontSize: 9,
                             color: PiColors.muted(context),
@@ -554,8 +557,8 @@ class HomeScreen extends StatelessWidget {
                         children: [
                           Text(
                             score.currentStreakWeeks == 0
-                                ? 'Construiește prima ta serie'
-                                : '${score.currentStreakWeeks} ${score.currentStreakWeeks == 1 ? 'săptămână' : 'săptămâni'} în ritm',
+                                ? 'Build your first streak'
+                                : '${score.currentStreakWeeks} ${score.currentStreakWeeks == 1 ? 'week' : 'weeks'} in a row',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -563,7 +566,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Streak săptămânal · record ${score.bestStreakWeeks}. Zilele de pauză au locul lor.',
+                            'Weekly streak · best ${score.bestStreakWeeks}. Rest days belong here too.',
                             style: TextStyle(
                               fontSize: 10,
                               height: 1.5,
@@ -578,8 +581,8 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               SectionHeading(
-                title: 'Rutine, pe stilul tău',
-                action: 'Vezi toate',
+                title: 'Routines, your way',
+                action: 'See all',
                 onAction: () => _routines(context),
               ),
               SizedBox(
@@ -660,7 +663,7 @@ class HomeScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 5),
                                   Text(
-                                    '${routine.exercises.length} exerciții · ${routine.estimatedMinutes} min',
+                                    '${routine.exercises.length} exercises · ${routine.estimatedMinutes} min',
                                     style: TextStyle(
                                       fontSize: 10,
                                       color: PiColors.muted(context),
@@ -717,7 +720,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 15),
                     const Text(
-                      'Un plan care ține cont de tine.',
+                      'A plan that fits your life.',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -726,7 +729,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                     Text(
-                      '${store.profile.experience} · ${store.profile.sessionsPerWeek} zile pe săptămână · ${store.profile.sessionMinutes} min pe sesiune',
+                      '${store.profile.experience} · ${store.profile.sessionsPerWeek} days per week · ${store.profile.sessionMinutes} min per session',
                       style: TextStyle(
                         fontSize: 11,
                         color: PiColors.muted(context),
@@ -737,7 +740,7 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            'Profil, istoric și recomandări personalizate',
+                            'Profile, history and personal guidance',
                             style: TextStyle(
                               fontSize: 10,
                               color: PiColors.muted(context),
@@ -768,14 +771,14 @@ class HomeScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Fă loc preferințelor tale.',
+                              'Make it yours.',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             Text(
-                              'Completează profilul, în ritmul tău.',
+                              'Complete your profile and set your own pace.',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: PiColors.muted(context),
@@ -883,10 +886,10 @@ class _WorkoutHero extends StatelessWidget {
                   const SizedBox(width: 7),
                   Text(
                     active
-                        ? 'SESIUNE ÎN CURS'
+                        ? 'WORKOUT IN PROGRESS'
                         : caption != null
-                        ? 'PROGRAMAT PENTRU TINE'
-                        : 'URMĂTOAREA TA SESIUNE',
+                        ? 'PLANNED FOR YOU'
+                        : 'YOUR NEXT SESSION',
                     style: const TextStyle(
                       color: Color(0xFFCFDBC8),
                       fontSize: 8,
@@ -899,8 +902,8 @@ class _WorkoutHero extends StatelessWidget {
               const SizedBox(height: 19),
               Text(
                 active
-                    ? 'Continuă de unde\nai rămas.'
-                    : title ?? 'Antrenează-te.\nSimte progresul.',
+                    ? 'Pick up where\nyou left off.'
+                    : title ?? 'Show up.\nFeel the progress.',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -913,7 +916,7 @@ class _WorkoutHero extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                caption ?? 'Fiecare set contează. Noi ținem evidența.',
+                caption ?? 'Every set counts. We keep track.',
                 style: const TextStyle(
                   color: Color(0xFFC0D0C4),
                   fontSize: 10,
@@ -928,7 +931,7 @@ class _WorkoutHero extends StatelessWidget {
                       onPressed: onStart,
                       icon: const Icon(Icons.play_arrow_rounded, size: 18),
                       label: Text(
-                        active ? 'Reia sesiunea' : 'Începe antrenamentul',
+                        active ? 'Resume workout' : 'Start workout',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ),
@@ -936,7 +939,7 @@ class _WorkoutHero extends StatelessWidget {
                   const SizedBox(width: 10),
                   IconButton.filledTonal(
                     onPressed: onRoutines,
-                    tooltip: 'Alege o rutină',
+                    tooltip: 'Choose a routine',
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.white.withValues(alpha: 0.12),
                       foregroundColor: Colors.white,

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Pi Fit — antrenamentele tale, progres măsurabil și un antrenor AI mereu alături.">
+  <meta name="description" content="Pi Fit — your workouts, measurable progress and a personal training coach.">
   <meta name="theme-color" content="#BCFF35">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -31,16 +31,46 @@
   </style>
 </head>
 <body>
-  <div id="launch" role="status" aria-label="Pi Fit se încarcă">
+  <div id="launch" role="status" aria-label="Pi Fit is loading">
     <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v3h-3v11h-3V8h-4v11H7V8H4z"/></svg></div>
     <h1>Pi Fit</h1>
     <p>Make progress. Every day.</p>
     <div class="loading" aria-hidden="true"></div>
   </div>
-  <noscript>Activează JavaScript pentru a folosi Pi Fit.</noscript>
+  <noscript>Enable JavaScript to use Pi Fit.</noscript>
   <script>
     window.addEventListener('flutter-first-frame', () => document.getElementById('launch')?.remove());
   </script>
-  <script src="flutter_bootstrap.js" async></script>
+  <script type="module">
+    // Printing uses this verified local PDF.js build instead of a runtime CDN.
+    // Load it before Flutter starts so its web plugin sees the same library.
+    try {
+      const pdfJsUrl = new URL('vendor/pdfjs/pdf.mjs', document.baseURI);
+      const pdfjsLib = await import(pdfJsUrl.href);
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdf.worker.mjs', pdfJsUrl).href;
+      // PDF.js transfers its input buffer to the worker. Printing also needs
+      // those bytes for sharing/printing after preview, so transfer a copy.
+      const copyPdfData = (data) => data instanceof ArrayBuffer
+        ? data.slice(0)
+        : ArrayBuffer.isView(data)
+          ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice()
+          : data;
+      globalThis.pdfjsLib = {
+        ...pdfjsLib,
+        getDocument(source) {
+          return pdfjsLib.getDocument(source && typeof source === 'object' && 'data' in source
+            ? { ...source, data: copyPdfData(source.data) }
+            : copyPdfData(source));
+        },
+      };
+    } catch (error) {
+      console.error('The local PDF preview could not be initialized.', error);
+    } finally {
+      const bootstrap = document.createElement('script');
+      bootstrap.src = new URL('flutter_bootstrap.js', document.baseURI).href;
+      bootstrap.async = true;
+      document.body.append(bootstrap);
+    }
+  </script>
 </body>
 </html>

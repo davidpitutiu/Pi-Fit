@@ -10,98 +10,59 @@ Map<String, dynamic> persisted(Map<String, dynamic> json) =>
 
 void main() {
   group('Exercise catalog', () {
-    test('has a full external catalog and original coaching instructions', () {
-      expect(exerciseCatalog.length, 878);
-      expect(
-        exerciseCatalog.map((exercise) => exercise.id).toSet().length,
-        exerciseCatalog.length,
-      );
-      for (final exercise in exerciseCatalog) {
-        expect(exercise.id, isNotEmpty, reason: exercise.name);
-        expect(exercise.muscle, isNotEmpty, reason: exercise.name);
-        expect(exercise.equipment, isNotEmpty, reason: exercise.name);
-        expect(exercise.description, isNotEmpty, reason: exercise.name);
-        expect(exercise.steps, isNotEmpty, reason: exercise.name);
-        if (exercise.instructionLanguage == 'ro') {
+    test(
+      'has a complete English catalog with useful instructions and stable identifiers',
+      () {
+        expect(exerciseCatalog.length, 878);
+        expect(
+          exerciseCatalog.map((exercise) => exercise.id).toSet().length,
+          exerciseCatalog.length,
+        );
+        for (final exercise in exerciseCatalog) {
+          expect(exercise.id, isNotEmpty, reason: exercise.name);
+          expect(exercise.name, isNotEmpty);
+          expect(exercise.muscle, isNotEmpty, reason: exercise.name);
+          expect(exercise.equipment, isNotEmpty, reason: exercise.name);
+          expect(exercise.description, isNotEmpty, reason: exercise.name);
+          expect(exercise.steps, isNotEmpty, reason: exercise.name);
           expect(
-            exercise.steps.length,
-            greaterThanOrEqualTo(3),
+            exercise.steps.every((step) => step.trim().isNotEmpty),
+            isTrue,
             reason: exercise.name,
           );
+          expect(exercise.instructionLanguage, 'en', reason: exercise.name);
+          expect(exercise.tips, isNotEmpty, reason: exercise.name);
+          expect(
+            exercise.difficulty,
+            isIn(['Beginner', 'Intermediate', 'Advanced']),
+            reason: exercise.name,
+          );
+          expect(
+            exercise.category,
+            isIn(['Strength', 'Cardio', 'Mobility', 'Plyometrics']),
+            reason: exercise.name,
+          );
+          expect(exercise.movement, isNotEmpty, reason: exercise.name);
+          expect(exercise.aliases, isNotEmpty, reason: exercise.name);
+          expect(exercise.sourceName, isNotEmpty, reason: exercise.name);
         }
-        expect(exercise.instructionLanguage, isIn(['ro', 'en']));
-        expect(exercise.tips, isNotEmpty, reason: exercise.name);
-        expect(
-          exercise.difficulty,
-          isIn(['Începător', 'Intermediar', 'Avansat']),
-          reason: exercise.name,
-        );
-        expect(
-          exercise.category,
-          isIn(['Forță', 'Cardio', 'Mobilitate', 'Pliometrie']),
-          reason: exercise.name,
-        );
-        expect(exercise.movement, isNotEmpty, reason: exercise.name);
-        expect(exercise.aliases, isNotEmpty, reason: exercise.name);
-        expect(exercise.sourceName, isNotEmpty, reason: exercise.name);
-      }
-    });
-
-    test(
-      'images are bundled or pinned remote assets, with honest missing states',
-      () {
-        const missingSourcePhotos = {
-          'Kettlebell_Halo',
-          'Kettlebell_Halo_With_Overhead_Extension',
-          'Kettlebell_Overhead_Triceps_Extension',
-        };
-        const photoBase =
-            'https://raw.githubusercontent.com/yuhonas/free-exercise-db/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/';
-        for (final exercise in exerciseCatalog) {
-          if (exercise.imageAsset.isNotEmpty) {
-            expect(exercise.imageAsset, startsWith('assets/exercises/'));
-            expect(
-              File(exercise.imageAsset).existsSync(),
-              isTrue,
-              reason: exercise.name,
-            );
-          } else if (exercise.imageUrl.isNotEmpty) {
-            expect(exercise.imageUrl, startsWith(photoBase));
-            expect(Uri.parse(exercise.imageUrl).scheme, 'https');
-            expect(exercise.secondaryImageUrl, startsWith(photoBase));
-          } else {
-            expect(
-              missingSourcePhotos,
-              contains(exercise.sourceId),
-              reason: exercise.name,
-            );
-          }
-          if (exercise.secondaryImageAsset.isNotEmpty) {
-            expect(
-              File(exercise.secondaryImageAsset).existsSync(),
-              isTrue,
-              reason: '${exercise.name}: ${exercise.secondaryImageAsset}',
-            );
-            expect(exercise.secondaryImageAsset, isNot(exercise.imageAsset));
-          }
-        }
-        expect(
-          exerciseCatalog
-              .where((exercise) => exercise.imageAsset.isNotEmpty)
-              .length,
-          216,
-        );
-        expect(
-          exerciseCatalog
-              .where((exercise) => exercise.imageUrl.isNotEmpty)
-              .length,
-          659,
-        );
       },
     );
 
     test(
-      'covers every pinned source record once and retains English source instructions',
+      'the vector catalog has no bundled or external exercise photo dependencies',
+      () {
+        for (final exercise in exerciseCatalog) {
+          expect(exercise.imageAsset, isEmpty, reason: exercise.name);
+          expect(exercise.secondaryImageAsset, isEmpty, reason: exercise.name);
+          expect(exercise.imageUrl, isEmpty, reason: exercise.name);
+          expect(exercise.secondaryImageUrl, isEmpty, reason: exercise.name);
+        }
+      },
+    );
+
+    test(
+      'covers every pinned source once and retains its English name and nonempty original instructions',
       () {
         final snapshot =
             jsonDecode(
@@ -127,25 +88,73 @@ void main() {
         final bySource = {
           for (final exercise in sourced) exercise.sourceId: exercise,
         };
+        final missingSourceInstructions = <String>{};
         for (final record in records) {
           final exercise = bySource[record['id']]!;
-          if (exercise.instructionLanguage == 'en') {
+          expect(exercise.name, record['name'], reason: exercise.sourceId);
+          expect(exercise.instructionLanguage, 'en', reason: exercise.sourceId);
+          final original = (record['instructions'] as List)
+              .cast<String>()
+              .where((step) => step.trim().isNotEmpty)
+              .toList();
+          if (original.isNotEmpty) {
+            expect(exercise.steps, original, reason: exercise.name);
+          } else {
+            missingSourceInstructions.add(exercise.sourceId);
             expect(
-              exercise.steps,
-              (record['instructions'] as List)
-                  .cast<String>()
-                  .where((step) => step.trim().isNotEmpty)
-                  .toList(),
+              exercise.steps.length,
+              greaterThanOrEqualTo(3),
+              reason: exercise.name,
+            );
+            expect(
+              exercise.steps.every((step) => step.trim().isNotEmpty),
+              isTrue,
               reason: exercise.name,
             );
           }
         }
+        expect(missingSourceInstructions, {
+          'Iron_Cross',
+          'One-Arm_Kettlebell_Swings',
+          'Push_Press',
+          'Side_Bridge',
+          'Side_Jackknife',
+        });
         expect(
-          sourced
-              .where((exercise) => exercise.instructionLanguage == 'en')
-              .length,
-          660,
+          exerciseCatalog
+              .where((exercise) => exercise.sourceId.isEmpty)
+              .map((exercise) => exercise.id)
+              .toSet(),
+          {'bird_dog', 'kettlebell_swing'},
         );
+      },
+    );
+
+    test(
+      'preserves every legacy exercise ID and its Romanian search alias',
+      () {
+        final legacy =
+            (jsonDecode(
+                      File(
+                        'assets/exercise-data/legacy-ids.json',
+                      ).readAsStringSync(),
+                    )
+                    as List)
+                .cast<Map<String, dynamic>>();
+        expect(legacy.length, 216);
+        final byId = {
+          for (final exercise in exerciseCatalog) exercise.id: exercise,
+        };
+        for (final previous in legacy) {
+          final exercise = byId[previous['id']];
+          expect(exercise, isNotNull, reason: previous['id'] as String);
+          expect(exercise!.sourceId, previous['sourceId'], reason: exercise.id);
+          expect(
+            exercise.aliases,
+            contains(previous['name']),
+            reason: exercise.id,
+          );
+        }
       },
     );
 
@@ -179,13 +188,13 @@ void main() {
 
     test('unknown exercise IDs can be handled without throwing', () {
       expect(exerciseById('missing'), isNull);
-      expect(exerciseById('bench_press')?.muscle, 'Piept');
+      expect(exerciseById('bench_press')?.muscle, 'Chest');
     });
   });
 
   group('Persistence', () {
     test(
-      'all exercises retain coaching and image metadata after JSON serialization',
+      'all exercises retain instruction and source metadata after JSON serialization',
       () {
         for (final original in exerciseCatalog) {
           final restored = Exercise.fromJson(persisted(original.toJson()));
@@ -206,10 +215,10 @@ void main() {
       expect(restored.secondaryImageAsset, isEmpty);
       expect(restored.imageUrl, isEmpty);
       expect(restored.secondaryImageUrl, isEmpty);
-      expect(restored.instructionLanguage, 'ro');
+      expect(restored.instructionLanguage, 'en');
       expect(restored.sourceId, isEmpty);
-      expect(restored.difficulty, 'Intermediar');
-      expect(restored.category, 'Forță');
+      expect(restored.difficulty, 'Intermediate');
+      expect(restored.category, 'Strength');
       expect(restored.aliases, isEmpty);
       expect(
         Exercise.fromJson(persisted(restored.toJson())).toJson(),

@@ -73,15 +73,15 @@ class MainActivity : FlutterFragmentActivity() {
         window.decorView.post {
             if (!isFinishing && !isDestroyed) {
                 AlertDialog.Builder(this)
-                    .setTitle("Pi Fit · confidențialitatea datelor de sănătate")
+                    .setTitle("Pi Fit · health data privacy")
                     .setMessage(
-                        "Pi Fit solicită acces de citire la pași, energie activă și antrenamente numai când apeși Conectează. " +
-                        "Datele sunt afișate local pentru ultimele 7 zile și rămân în memoria ecranului. " +
-                        "Nu sunt trimise către Firebase sau AI, nu sunt folosite pentru publicitate și nu modifică scorul ori streak-ul. " +
-                        "Versiunea curentă nu scrie sau exportă date către Health Connect. " +
-                        "Poți modifica sau retrage accesul în Health Connect, la Permisiuni aplicații → Pi Fit."
+                        "Pi Fit requests read access to steps, active energy, workouts, heart rate, height and weight only when you tap Connect. " +
+                        "Readings are displayed locally. Raw heart rate, activity and workout records are not sent to your account or AI coach, and do not change your score or streak. " +
+                        "A body measurement is saved to your Pi Fit profile only if you explicitly select and import it; imported profile measurements follow your account backup and AI-sharing settings. " +
+                        "This Android integration does not write or export records to Health Connect. " +
+                        "Change or revoke access in Health Connect under App permissions → Pi Fit."
                     )
-                    .setPositiveButton("Am înțeles", null)
+                    .setPositiveButton("Got it", null)
                     .show()
             }
         }

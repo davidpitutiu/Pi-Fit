@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleDisplayName</key><string>Pi Fit</string>
+    <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>WKApplication</key><true/>
+    <key>WKCompanionAppBundleIdentifier</key><string>com.pifit.app</string>
+    <key>WKRunsIndependentlyOfCompanionApp</key><false/>
+    <key>WKBackgroundModes</key><array><string>workout-processing</string></array>
+    <key>NSHealthShareUsageDescription</key><string>Pi Fit reads real heart-rate samples during a workout and streams them to your paired iPhone while reachable.</string>
+    <key>NSHealthUpdateUsageDescription</key><string>Pi Fit needs workout-session permission to run the live heart-rate sensor session. This watch session is discarded when stopped instead of saving a duplicate workout.</string>
+</dict></plist>

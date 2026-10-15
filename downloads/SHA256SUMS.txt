@@ -1,2 +1,2 @@
-bb7dfb935f96244ecb0252d5fdda06a64abc487ba63321f7bf49bebf9dc9d852  Pi-Fit-Android-arm64.apk
-4aedcbe66ea641d9dad127670c99b7f2e5a903750816b2ae7ee7a91913914ef6  Pi-Fit-Android-armv7.apk
+b9677ec20b986e836b9a184b217b97f0e43f4f55c998908c2cb1a02db6a52897  Pi-Fit-Android-arm64.apk
+3185a49a55d9b39ca237d2df3df029eb9ac01ef78efc1f2cd3addc7fb30cce3a  Pi-Fit-Android-armv7.apk

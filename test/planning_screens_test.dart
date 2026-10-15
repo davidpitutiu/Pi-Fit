@@ -44,9 +44,9 @@ void main() {
     tester,
   ) async {
     await showScreen(tester, CalendarScreen(store: store), width: 320);
-    await tester.tap(find.text('Programează antrenamente'));
+    await tester.tap(find.text('Schedule workouts'));
     await tester.pumpAndSettle();
-    final save = find.text('Adaugă 1 sesiune');
+    final save = find.text('Add 1 session');
     await tester.ensureVisible(save);
     await tester.tap(save);
     await tester.pumpAndSettle();
@@ -54,7 +54,7 @@ void main() {
     expect(store.schedule, hasLength(1));
     expect(store.schedule.single.date.isAfter(DateTime.now()), isTrue);
     expect(store.schedule.single.reminder, isFalse);
-    expect(find.text('1 antrenament salvat în calendar.'), findsOneWidget);
+    expect(find.text('1 saved workout in your calendar.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -62,12 +62,12 @@ void main() {
     tester,
   ) async {
     await showScreen(tester, CalendarScreen(store: store));
-    await tester.tap(find.text('Programează antrenamente'));
+    await tester.tap(find.text('Schedule workouts'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('În serie'));
+    await tester.tap(find.text('Repeat'));
     await tester.pumpAndSettle();
 
-    for (final day in ['Lu', 'Ma', 'Mi', 'Jo', 'Vi', 'Sâ', 'Du']) {
+    for (final day in ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']) {
       final chip = find.widgetWithText(FilterChip, day);
       await tester.ensureVisible(chip);
       if (!tester.widget<FilterChip>(chip).selected) {
@@ -75,7 +75,7 @@ void main() {
         await tester.pumpAndSettle();
       }
     }
-    final save = find.text('Adaugă 28 sesiuni');
+    final save = find.text('Add 28 sessions');
     await tester.ensureVisible(save);
     await tester.tap(save);
     await tester.pumpAndSettle();
@@ -86,7 +86,7 @@ void main() {
       store.schedule.every((event) => event.date.isAfter(DateTime.now())),
       isTrue,
     );
-    expect(find.text('28 antrenamente salvate în calendar.'), findsOneWidget);
+    expect(find.text('28 saved workouts in your calendar.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -97,10 +97,10 @@ void main() {
     store.history.add(
       WorkoutSession(
         id: 'test-session',
-        routineName: 'Sesiune verificată',
+        routineName: 'Verified session',
         startedAt: start,
         finishedAt: start.add(const Duration(minutes: 35)),
-        notes: 'Tehnică bună',
+        notes: 'Good form',
         exercises: [
           WorkoutExercise(
             exerciseId: store.exercises.first.id,
@@ -120,11 +120,11 @@ void main() {
     await tester.ensureVisible(record);
     expect(record, findsOneWidget);
     expect(find.text('80 kg × 10'), findsNothing);
-    final history = find.text('Sesiune verificată');
+    final history = find.text('Verified session');
     await tester.ensureVisible(history);
     await tester.tap(history);
     await tester.pumpAndSettle();
-    expect(find.text('1 / 2 seturi'), findsNWidgets(2));
+    expect(find.text('1 / 2 sets'), findsNWidgets(2));
     expect(
       find.descendant(
         of: find.byType(BottomSheet),
@@ -135,13 +135,13 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(BottomSheet),
-        matching: find.text('1RM estimat · 26.7 kg'),
+        matching: find.text('Estimated 1RM · 26.7 kg'),
       ),
       findsOneWidget,
     );
     expect(find.text('80 kg × 10'), findsOneWidget);
-    await tester.ensureVisible(find.text('Tehnică bună'));
-    expect(find.text('Tehnică bună'), findsOneWidget);
+    await tester.ensureVisible(find.text('Good form'));
+    expect(find.text('Good form'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -154,7 +154,7 @@ void main() {
       store.history.add(
         WorkoutSession(
           id: id,
-          routineName: 'Sesiune $id',
+          routineName: 'Session $id',
           startedAt: date,
           finishedAt: date.add(const Duration(minutes: 30)),
           exercises: [
@@ -179,15 +179,15 @@ void main() {
       width: 320,
       textScale: 1.3,
     );
-    expect(find.text('4 / 12 zile active'), findsOneWidget);
+    expect(find.text('4 / 12 active days'), findsOneWidget);
     expect(find.text('31'), findsOneWidget);
-    await tester.ensureVisible(find.text('Vezi calculul complet'));
-    await tester.tap(find.text('Vezi calculul complet'));
+    await tester.ensureVisible(find.text('See the calculation'));
+    await tester.tap(find.text('See the calculation'));
     await tester.pumpAndSettle();
-    expect(find.text('Cum se calculează scorul'), findsOneWidget);
-    expect(find.text('4 / 12 · 23.3 din 70 puncte'), findsOneWidget);
-    expect(find.text('1 / 4 · 7.5 din 30 puncte'), findsOneWidget);
-    final formula = find.textContaining('Scor = 70');
+    expect(find.text('How your score is calculated'), findsOneWidget);
+    expect(find.text('4 / 12 · 23.3 of 70 points'), findsOneWidget);
+    expect(find.text('1 / 4 · 7.5 of 30 points'), findsOneWidget);
+    final formula = find.textContaining('Score = 70');
     await tester.ensureVisible(formula);
     expect(formula, findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -201,7 +201,7 @@ void main() {
       final date = DateTime(now.year, now.month, now.day - daysAgo);
       return WorkoutSession(
         id: id,
-        routineName: 'Sesiune $id',
+        routineName: 'Session $id',
         startedAt: date,
         finishedAt: finished ? date.add(const Duration(minutes: 20)) : null,
         exercises: [
@@ -227,17 +227,13 @@ void main() {
       of: find.ancestor(of: find.text(label), matching: find.byType(PiCard)),
       matching: find.text(value),
     );
-    for (final label in [
-      'antrenamente salvate',
-      'seturi completate',
-      'zile active',
-    ]) {
+    for (final label in ['saved workouts', 'completed sets', 'active days']) {
       await tester.ensureVisible(find.text(label));
       expect(metric(label, '1'), findsOneWidget);
     }
-    await tester.ensureVisible(find.text('kg · volum extern'));
-    expect(metric('kg · volum extern', '200'), findsOneWidget);
-    await tester.ensureVisible(find.text('Seturi pe grupa principală'));
+    await tester.ensureVisible(find.text('kg · external volume'));
+    expect(metric('kg · external volume', '200'), findsOneWidget);
+    await tester.ensureVisible(find.text('Sets by primary muscle'));
     expect(find.text('1 set'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -251,9 +247,9 @@ void main() {
         width: 320,
         textScale: 1.3,
       );
-      expect(find.text('fără date'), findsOneWidget);
+      expect(find.text('no data'), findsOneWidget);
       expect(find.text('—'), findsOneWidget);
-      final choose = find.text('Alege un antrenament');
+      final choose = find.text('Choose a workout');
       await tester.ensureVisible(choose);
       await tester.tap(choose);
       await tester.pumpAndSettle();
@@ -269,10 +265,10 @@ void main() {
     store.history.add(
       WorkoutSession(
         id: 'narrow',
-        routineName: 'Antrenament cu descriere lungă',
+        routineName: 'A workout with a long description',
         startedAt: start,
         finishedAt: start.add(const Duration(minutes: 45)),
-        notes: 'Pauze de două minute între seturi.',
+        notes: 'Two-minute rests between sets.',
         exercises: [
           WorkoutExercise(
             exerciseId: store.exercises.first.id,
@@ -291,21 +287,21 @@ void main() {
       textScale: 1.3,
     );
     for (final title in [
-      'Ultimele 28 de zile',
-      'Evoluția antrenamentelor',
-      'Seturi pe grupa principală',
-      'Recorduri personale',
-      'Antrenament cu descriere lungă',
+      'Your last 28 days',
+      'Training over time',
+      'Sets by primary muscle',
+      'Personal records',
+      'A workout with a long description',
     ]) {
       await tester.ensureVisible(find.text(title));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }
-    await tester.tap(find.text('Antrenament cu descriere lungă'));
+    await tester.tap(find.text('A workout with a long description'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Set completat'), findsOneWidget);
-    expect(find.byTooltip('Set planificat, neefectuat'), findsOneWidget);
-    await tester.ensureVisible(find.text('Pauze de două minute între seturi.'));
+    expect(find.byTooltip('Completed set'), findsOneWidget);
+    expect(find.byTooltip('Planned set, not completed'), findsOneWidget);
+    await tester.ensureVisible(find.text('Two-minute rests between sets.'));
     expect(tester.takeException(), isNull);
   });
 
@@ -340,7 +336,7 @@ void main() {
       await tester.ensureVisible(period);
       await tester.tap(period);
       await tester.pumpAndSettle();
-      expect(find.text('Ultimele 90 de zile'), findsOneWidget);
+      expect(find.text('Your last 90 days'), findsOneWidget);
       final total = find.byKey(const ValueKey('trend-total'));
       await tester.ensureVisible(total);
       expect(tester.widget<Text>(total).data, '500');
@@ -355,11 +351,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.widget<Text>(total).data, item.$2);
       }
-      final values = find.text('Vezi valorile');
+      final values = find.text('View values');
       await tester.ensureVisible(values);
       await tester.tap(values);
       await tester.pumpAndSettle();
-      expect(find.text('Minute · valorile graficului'), findsOneWidget);
+      expect(find.text('Minutes · chart values'), findsOneWidget);
       expect(find.text('20 min'), findsOneWidget);
       expect(find.text('30 min'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -375,7 +371,7 @@ void main() {
         store.history.add(
           WorkoutSession(
             id: 'point-${item.$1}',
-            routineName: 'Progres',
+            routineName: 'Progress',
             startedAt: start,
             finishedAt: start.add(const Duration(minutes: 30)),
             exercises: [
@@ -401,15 +397,12 @@ void main() {
       tester.widget<Slider>(slider).onChanged!(0);
       await tester.pumpAndSettle();
       expect(tester.widget<Text>(value).data, '20 kg');
-      final estimated = find.widgetWithText(ChoiceChip, '1RM estimat');
+      final estimated = find.widgetWithText(ChoiceChip, 'Estimated 1RM');
       await tester.ensureVisible(estimated);
       await tester.tap(estimated);
       await tester.pumpAndSettle();
       expect(tester.widget<Text>(value).data, '40 kg');
-      expect(
-        find.textContaining('Epley, numai seturi de 1–12'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Epley, using sets of 1–12'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -450,7 +443,7 @@ void main() {
         width: 320,
         textScale: 1.3,
       );
-      final title = find.text('Revii. Construiești. Repeți.');
+      final title = find.text('Show up. Build. Repeat.');
       await tester.ensureVisible(title);
       final streakCard = find.ancestor(
         of: title,
@@ -460,12 +453,12 @@ void main() {
         find.descendant(of: streakCard, matching: find.text('2')),
         findsNWidgets(2),
       );
-      expect(find.text('Săptămâna aceasta · 0 / 3 zile'), findsOneWidget);
+      expect(find.text('This week · 0 / 3 days'), findsOneWidget);
       await tester.tap(title);
       await tester.pumpAndSettle();
-      expect(find.text('Cum funcționează seria'), findsOneWidget);
+      expect(find.text('How your streak works'), findsOneWidget);
       expect(
-        find.textContaining('Obiectivul curent: 3 zile active'),
+        find.textContaining('Current goal: 3 active days'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
@@ -482,11 +475,11 @@ void main() {
     await store.finishWorkout();
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(total).data, '200');
-    expect(find.text('1 / 12 zile active'), findsOneWidget);
-    expect(find.text('fără date'), findsNothing);
+    expect(find.text('1 / 12 active days'), findsOneWidget);
+    expect(find.text('no data'), findsNothing);
     await store.updateUserProfile(store.profile.copyWith(sessionsPerWeek: 4));
     await tester.pumpAndSettle();
-    expect(find.text('1 / 16 zile active'), findsOneWidget);
+    expect(find.text('1 / 16 active days'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

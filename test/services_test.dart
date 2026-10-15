@@ -6,6 +6,120 @@ import 'package:pi_fit/services/firebase_gateway.dart';
 
 void main() {
   test(
+    'token privacy binding accepts the captured UID without exposing other claims',
+    () {
+      final token = _token({
+        'sub': 'alice',
+        'user_id': 'alice',
+        'email': 'private@example.invalid',
+      });
+      expect(
+        CoachService.tokenMatchesUser(
+          token,
+          requestedUid: 'alice',
+          currentUid: 'alice',
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'token privacy binding rejects a switched SDK identity or native token subject',
+    () {
+      expect(
+        CoachService.tokenMatchesUser(
+          _token({'sub': 'alice'}),
+          requestedUid: 'alice',
+          currentUid: 'bob',
+        ),
+        isFalse,
+      );
+      // Native Auth already switched to Bob while the Dart cache still shows Alice.
+      expect(
+        CoachService.tokenMatchesUser(
+          _token({'sub': 'bob', 'user_id': 'bob'}),
+          requestedUid: 'alice',
+          currentUid: 'alice',
+        ),
+        isFalse,
+      );
+      expect(
+        CoachService.tokenMatchesUser(
+          _token({'sub': 'alice', 'user_id': 'bob'}),
+          requestedUid: 'alice',
+          currentUid: 'alice',
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'token privacy binding rejects missing subjects and malformed tokens',
+    () {
+      for (final token in [
+        '',
+        'not-a-jwt',
+        'header.%%%.signature',
+        _token({}),
+        _token({'sub': ''}),
+      ]) {
+        expect(
+          CoachService.tokenMatchesUser(
+            token,
+            requestedUid: 'alice',
+            currentUid: 'alice',
+          ),
+          isFalse,
+        );
+      }
+      expect(
+        CoachService.tokenMatchesUser(
+          _token({'sub': 'alice'}),
+          requestedUid: 'alice',
+          currentUid: null,
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'local live advice uses the explicit exercise and reported RPE without inventing a load',
+    () async {
+      final context = jsonDecode(_context()) as Map<String, dynamic>;
+      context['currentExerciseId'] = 'row';
+      context['activeWorkout'] = {
+        'exercises': [
+          {
+            'exerciseId': 'press',
+            'name': 'Press',
+            'sets': [
+              {'completed': true, 'reps': 10, 'weight': 40, 'rpe': 3},
+            ],
+          },
+          {
+            'exerciseId': 'row',
+            'name': 'One-arm row',
+            'sets': [
+              {'completed': true, 'reps': 10, 'weight': 20, 'rpe': 9.5},
+            ],
+          },
+        ],
+      };
+      final reply = await CoachService().reply(
+        'Help with my next set.',
+        context: jsonEncode(context),
+      );
+      expect(reply, contains('One-arm row: you reported RPE 9.5/10'));
+      expect(reply, contains('avoid increasing the next-set load'));
+      expect(reply, isNot(contains('Press:')));
+      expect(reply, isNot(contains('21 kg')));
+    },
+  );
+
+  test(
     'local coach clearly identifies advice without a configured AI',
     () async {
       final coach = CoachService();
@@ -15,14 +129,12 @@ void main() {
         context: 'Niciun antrenament înregistrat.',
       );
       expect(
-        reply.startsWith(
-          'Sugestie locală · AI-ul online nu este configurat\n\n',
-        ),
+        reply.startsWith('Local suggestion · online AI is not configured\n\n'),
         isTrue,
       );
-      expect(reply, contains('Câte zile pe săptămână'));
-      expect(reply, isNot(contains('3 ședințe full body')));
-      expect(reply, contains('repetări în rezervă'));
+      expect(reply, contains('How many days per week'));
+      expect(reply, isNot(contains('3 full-body sessions')));
+      expect(reply, contains('reps in reserve'));
     },
   );
 
@@ -34,12 +146,12 @@ void main() {
         context: _context(days: 4, minutes: 30),
         allowRemote: false,
       );
-      expect(reply, contains('4 ședințe:'));
-      expect(reply, contains('30 minute'));
-      expect(reply, contains('Cu gantere'));
-      expect(reply, contains('3 exerciții, 2 seturi'));
-      expect(reply, isNot(contains('3 ședințe full body')));
-      expect(reply, contains('nu am adăugat nimic în calendar'));
+      expect(reply, contains('4 sessions:'));
+      expect(reply, contains('30 minutes'));
+      expect(reply, contains('With dumbbells'));
+      expect(reply, contains('3 exercises, 2 working sets'));
+      expect(reply, isNot(contains('3 full-body sessions')));
+      expect(reply, contains('nothing was added to your calendar'));
     },
   );
 
@@ -55,8 +167,8 @@ void main() {
           ],
         ),
       );
-      expect(reply, contains('de la 10 la 12 repetări la 20 kg'));
-      expect(reply, contains('Jurnalul nu confirmă tehnica'));
+      expect(reply, contains('from 10 to 12 reps at 20 kg'));
+      expect(reply, contains('The log does not confirm technique'));
       expect(reply, isNot(contains('100 kg'))); // Unfinished set is excluded.
     },
   );
@@ -68,8 +180,8 @@ void main() {
         'Cum progresez?',
         context: _context(sessions: [_session('2026-10-14', reps: 10)]),
       );
-      expect(reply, contains('o singură ședință'));
-      expect(reply, contains('nu pot stabili o tendință'));
+      expect(reply, contains('only one session'));
+      expect(reply, contains('cannot establish a trend'));
       expect(reply, isNot(contains('2–5%')));
     },
   );
@@ -87,8 +199,8 @@ void main() {
           ],
         ),
       );
-      expect(reply, contains('ultimele 3 ședințe'));
-      expect(reply, contains('nu dovedește un platou fiziologic'));
+      expect(reply, contains('last 3 sessions'));
+      expect(reply, contains('does not establish a physiological plateau'));
     },
   );
 
@@ -103,8 +215,8 @@ void main() {
           {'role': 'assistant', 'content': 'Un plan pentru două zile.'},
         ],
       );
-      expect(reply, contains('2 ședințe full body'));
-      expect(reply, contains('8–12 repetări'));
+      expect(reply, contains('2 full-body sessions'));
+      expect(reply, contains('8–12 reps'));
     },
   );
 
@@ -152,8 +264,8 @@ void main() {
         allowRemote: false,
       );
       // No Firebase user is initialized: attempting the remote path would throw.
-      expect(reply, startsWith('Sugestie locală · răspuns fără AI online'));
-      expect(reply, contains('2 ședințe full body'));
+      expect(reply, startsWith('Local suggestion · no online AI used'));
+      expect(reply, contains('2 full-body sessions'));
       await expectLater(
         coach.reply('Vreau un program', context: _context(days: 2)),
         throwsStateError,
@@ -168,9 +280,9 @@ void main() {
         'Mă doare genunchiul la genuflexiuni.',
         context: '',
       );
-      expect(reply, contains('Sugestie locală'));
-      expect(reply, contains('Oprește exercițiul'));
-      expect(reply, contains('medic sau fizioterapeut'));
+      expect(reply, contains('Local suggestion'));
+      expect(reply, contains('Stop the exercise'));
+      expect(reply, contains('doctor or physiotherapist'));
     },
   );
 
@@ -193,9 +305,9 @@ void main() {
         localContext: jsonEncode(privateData),
         allowRemote: false,
       );
-      expect(reply, startsWith('Sugestie locală'));
+      expect(reply, startsWith('Local suggestion'));
       expect(reply, contains(limitation));
-      expect(reply, contains('2 ședințe full body'));
+      expect(reply, contains('2 full-body sessions'));
       expect(remoteContext, isNot(contains(limitation)));
     },
   );
@@ -249,3 +361,6 @@ Map<String, dynamic> _session(String date, {required int reps}) => {
     },
   ],
 };
+
+String _token(Map<String, dynamic> claims) =>
+    'header.${base64Url.encode(utf8.encode(jsonEncode(claims))).replaceAll('=', '')}.signature';

@@ -114,3 +114,20 @@ test('anonymous accounts, missing App Check and rate limits prevent provider cal
   assert.equal(response.headers['Retry-After'], '60');
   assert.equal(calls, 0);
 });
+
+test('the HTTP boundary returns validated program previews and rejects unsafe provider output', async () => {
+  const {context, proposal} = require('./proposal-fixtures.cjs');
+  const valid = proposal();
+  const handler = createCoachHandler(dependencies({askProvider: async () => ({reply: 'Review before applying.', proposal: valid})}));
+  const response = await dispatch(handler, {...authenticated, body: {
+    message: 'Create a workout plan', context: context(), history: [],
+  }});
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body.proposal, valid);
+  const unsafe = proposal();
+  unsafe.routines[0].exercises[0].exerciseId = 'invented-exercise';
+  const unsafeHandler = createCoachHandler(dependencies({askProvider: async () => ({reply: 'Unsafe', proposal: unsafe})}));
+  assert.equal((await dispatch(unsafeHandler, {...authenticated, body: {
+    message: 'Create a workout plan', context: context(), history: [],
+  }})).statusCode, 502);
+});

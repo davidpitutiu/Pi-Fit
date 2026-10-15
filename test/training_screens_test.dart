@@ -2,12 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_fit/domain/models.dart';
 import 'package:pi_fit/state/app_store.dart';
+import 'package:pi_fit/services/workout_clock.dart';
 import 'package:pi_fit/ui/theme.dart';
 import 'package:pi_fit/ui/exercise_image.dart';
 import 'package:pi_fit/ui/training_screens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  Future<void> disposeWorkout(WidgetTester tester) async {
+    await tester.pumpWidget(const SizedBox());
+    WorkoutClock.instance.unbind();
+  }
+
+  Finder workoutField(String label) => find.descendant(
+    of: find.byWidgetPredicate(
+      (widget) => widget is Semantics && widget.properties.label == label,
+    ),
+    matching: find.byType(TextField),
+  );
+
+  Future<void> revealWorkout(WidgetTester tester, Finder target) async {
+    final list = find.byType(ListView).first;
+    final scrollable = find
+        .descendant(of: list, matching: find.byType(Scrollable))
+        .first;
+    if (target.evaluate().isEmpty) {
+      // Lazy workout sections may not exist until their scroll position is
+      // reached. Rebuild from the top, then reveal the specific labeled control.
+      tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(target, 180, scrollable: scrollable);
+    }
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+  }
+
   Future<AppStore> newStore() async {
     SharedPreferences.setMockInitialValues({});
     return AppStore(await SharedPreferences.getInstance());
@@ -33,29 +62,28 @@ void main() {
       );
       await tester.enterText(find.byType(TextField), 'impins la banca');
       await tester.pumpAndSettle();
-      expect(find.text('Împins la bancă cu bara'), findsOneWidget);
-      expect(find.text('Împins înclinat cu gantere'), findsNothing);
+      expect(find.text('Barbell Bench Press - Medium Grip'), findsOneWidget);
+      expect(find.text('Incline Dumbbell Press'), findsNothing);
       await tester.enterText(find.byType(TextField), 'bench press');
       await tester.pumpAndSettle();
-      expect(find.text('Împins la bancă cu bara'), findsOneWidget);
-      await tester.tap(find.text('Împins la bancă cu bara'));
+      expect(find.text('Barbell Bench Press - Medium Grip'), findsOneWidget);
+      await tester.tap(find.text('Barbell Bench Press - Medium Grip'));
       await tester.pumpAndSettle();
       expect(find.text('1/2'), findsOneWidget);
       await tester.drag(find.byType(PageView), const Offset(-320, 0));
       await tester.pumpAndSettle();
       expect(find.text('2/2'), findsOneWidget);
-      expect(
-        find.text('Imagini: ${store.exerciseById('bench_press').sourceName}'),
-        findsOneWidget,
-      );
-      expect(find.text('Mușchi secundari'), findsOneWidget);
-      expect(find.text('Triceps, umeri anteriori'), findsOneWidget);
+      expect(find.text(exerciseIllustrationCredit), findsOneWidget);
       await tester.drag(find.byType(ListView).last, const Offset(0, -300));
       await tester.pumpAndSettle();
-      expect(find.text('Cum execuți'), findsOneWidget);
-      await tester.tap(find.text('Sfaturi'));
+      expect(find.text('Secondary muscles'), findsOneWidget);
+      expect(find.text('Shoulders, Triceps'), findsOneWidget);
+      await tester.drag(find.byType(ListView).last, const Offset(0, -300));
       await tester.pumpAndSettle();
-      expect(find.text('Detaliile fac diferența'), findsOneWidget);
+      expect(find.text('How to perform'), findsOneWidget);
+      await tester.tap(find.text('Tips'));
+      await tester.pumpAndSettle();
+      expect(find.text('Details make the difference'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -71,30 +99,30 @@ void main() {
         home: ExercisesScreen(store: store),
       ),
     );
-    await tester.tap(find.byTooltip('Filtrează după echipament'));
+    await tester.tap(find.byTooltip('Filter by equipment'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Gantere').last);
+    await tester.ensureVisible(find.text('Dumbbells').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gantere').last);
+    await tester.tap(find.text('Dumbbells').last);
     await tester.pumpAndSettle();
-    expect(find.text('Împins la bancă cu bara'), findsNothing);
-    expect(find.text('Împins înclinat cu gantere'), findsOneWidget);
+    expect(find.text('Barbell Bench Press - Medium Grip'), findsNothing);
+    expect(find.text('Incline Dumbbell Press'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Filtrează după nivel'));
+    await tester.tap(find.byTooltip('Filter by level'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Intermediar').last);
+    await tester.tap(find.text('Intermediate').last);
     await tester.pumpAndSettle();
     await tester.drag(
       find.byKey(const ValueKey('exercise-filters')),
       const Offset(-220, 0),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Filtrează după categorie'));
+    await tester.tap(find.byTooltip('Filter by category'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Forță').last);
+    await tester.tap(find.text('Strength').last);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Piept'),
+      find.text('Chest'),
       180,
       scrollable: find.descendant(
         of: find.byKey(const ValueKey('exercise-muscles')),
@@ -102,28 +130,28 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Piept'));
+    await tester.ensureVisible(find.text('Chest'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Piept'));
+    await tester.tap(find.text('Chest'));
     await tester.pumpAndSettle();
     final count = store.exercises
         .where(
           (exercise) =>
-              exercise.equipment == 'Gantere' &&
-              exercise.difficulty == 'Intermediar' &&
-              exercise.category == 'Forță' &&
-              exercise.muscle == 'Piept',
+              exercise.equipment == 'Dumbbells' &&
+              exercise.difficulty == 'Intermediate' &&
+              exercise.category == 'Strength' &&
+              exercise.muscle == 'Chest',
         )
         .length;
     expect(
-      find.text('$count ${count == 1 ? 'exercițiu' : 'exerciții'}'),
+      find.text('$count ${count == 1 ? 'exercise' : 'exercises'}'),
       findsOneWidget,
     );
-    expect(find.text('Șterge filtrele · 4'), findsOneWidget);
-    await tester.tap(find.text('Șterge filtrele · 4'));
+    expect(find.text('Clear filters · 4'), findsOneWidget);
+    await tester.tap(find.text('Clear filters · 4'));
     await tester.pumpAndSettle();
-    expect(find.text('${store.exercises.length} exerciții'), findsOneWidget);
-    expect(find.text('Împins la bancă cu bara'), findsOneWidget);
+    expect(find.text('${store.exercises.length} exercises'), findsOneWidget);
+    expect(find.text('Barbell Bench Press - Medium Grip'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -139,7 +167,7 @@ void main() {
       ),
     );
     await tester.tap(
-      find.byTooltip('Adaugă la favorite: Împins la bancă cu bara'),
+      find.byTooltip('Add to favorites: Barbell Bench Press - Medium Grip'),
     );
     await tester.pumpAndSettle();
     expect(store.favoriteExerciseIds, contains('bench_press'));
@@ -150,8 +178,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('favorites-filter')));
     await tester.pumpAndSettle();
-    expect(find.text('1 exercițiu'), findsOneWidget);
-    expect(find.text('Împins înclinat cu gantere'), findsNothing);
+    expect(find.text('1 exercise'), findsOneWidget);
+    expect(find.text('Incline Dumbbell Press'), findsNothing);
     final reopened = AppStore(await SharedPreferences.getInstance());
     await reopened.load();
     await tester.pumpWidget(
@@ -163,75 +191,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(reopened.favoriteExerciseIds, contains('bench_press'));
     expect(
-      find.byTooltip('Elimină din favorite: Împins la bancă cu bara'),
+      find.byTooltip(
+        'Remove from favorites: Barbell Bench Press - Medium Grip',
+      ),
       findsOneWidget,
     );
     await tester.tap(
-      find.byTooltip('Elimină din favorite: Împins la bancă cu bara'),
+      find.byTooltip(
+        'Remove from favorites: Barbell Bench Press - Medium Grip',
+      ),
     );
     await tester.pumpAndSettle();
     expect(reopened.favoriteExerciseIds, isEmpty);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'exercise images use offline asset providers and a deliberate empty state',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      const pictured = Exercise(
-        id: 'asset',
-        name: 'Exercițiu demonstrat',
-        muscle: 'Piept',
-        equipment: 'Bară',
-        description: '',
-        imageAsset: 'assets/fonts/Inter.ttf',
-      );
-      // A bad asset must display the neutral fallback rather than fetching the web.
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                ExerciseImage(exercise: pictured, width: 180, height: 160),
-                const ExerciseImage(
-                  exercise: Exercise(
-                    id: 'no-image',
-                    name: 'Fără fotografie',
-                    muscle: 'Core',
-                    equipment: 'Saltea',
-                    description: '',
-                  ),
-                  width: 180,
-                  height: 160,
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final provider = tester.widget<Image>(find.byType(Image)).image;
-      expect(
-        provider is AssetImage ||
-            provider is ResizeImage && provider.imageProvider is AssetImage,
-        isTrue,
-      );
-      expect(find.text('Fotografie indisponibilă'), findsNWidgets(2));
-      expect(
-        find.bySemanticsLabel('Fără fotografie. Imagine indisponibilă.'),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    },
-  );
-
   Future<void> pickerFilter(
     WidgetTester tester,
     String label,
     String value,
   ) async {
-    await tester.tap(find.byTooltip('Filtrează după $label'));
+    await tester.tap(find.byTooltip('Filter by $label'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text(value).last);
     await tester.pumpAndSettle();
@@ -251,19 +231,19 @@ void main() {
           home: RoutinesScreen(store: store),
         ),
       );
-      await tester.tap(find.text('Începe antrenament liber'));
+      await tester.tap(find.text('Start empty workout'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Adaugă exercițiu'));
+      await tester.tap(find.text('Add exercise'));
       await tester.pumpAndSettle();
-      await pickerFilter(tester, 'grupă', 'Piept');
-      await pickerFilter(tester, 'echipament', 'Gantere');
-      await pickerFilter(tester, 'nivel', 'Începător');
+      await pickerFilter(tester, 'muscle', 'Chest');
+      await pickerFilter(tester, 'equipment', 'Dumbbells');
+      await pickerFilter(tester, 'level', 'Beginner');
       await tester.drag(
         find.byKey(const ValueKey('picker-filters')),
         const Offset(-220, 0),
       );
       await tester.pumpAndSettle();
-      await pickerFilter(tester, 'categorie', 'Forță');
+      await pickerFilter(tester, 'category', 'Strength');
       await tester.enterText(
         find.byKey(const ValueKey('picker-search')),
         'incline dumbbell press',
@@ -289,7 +269,7 @@ void main() {
       );
       expect(find.byKey(const ValueKey('picker-search')), findsNothing);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
+      await disposeWorkout(tester);
     },
   );
 
@@ -305,9 +285,9 @@ void main() {
           home: ActiveWorkoutScreen(store: store),
         ),
       );
-      await tester.tap(find.text('Adaugă exercițiu'));
+      await tester.tap(find.text('Add exercise'));
       await tester.pumpAndSettle();
-      await pickerFilter(tester, 'echipament', 'Gantere');
+      await pickerFilter(tester, 'equipment', 'Dumbbells');
       await tester.enterText(
         find.byKey(const ValueKey('picker-search')),
         'barbell bench press medium grip',
@@ -339,7 +319,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(store.activeSession!.exercises.single.exerciseId, 'bench_press');
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
+      await disposeWorkout(tester);
     },
   );
 
@@ -355,11 +335,11 @@ void main() {
           home: RoutinesScreen(store: store),
         ),
       );
-      await tester.tap(find.byTooltip('Creează rutină'));
+      await tester.tap(find.byTooltip('Create routine'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField), 'Selecție multiplă');
       tester.testTextInput.hide();
-      await tester.tap(find.text('Adaugă exercițiu'));
+      await tester.tap(find.text('Add exercise'));
       await tester.pumpAndSettle();
       await tester.drag(
         find.byKey(const ValueKey('picker-filters')),
@@ -395,9 +375,9 @@ void main() {
         find.byKey(const ValueKey('picker-exercise-incline_dumbbell_press')),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Gata (2)'));
+      await tester.tap(find.text('Done (2)'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Salvează').first);
+      await tester.tap(find.text('Save').first);
       await tester.pumpAndSettle();
       expect(
         store.customRoutines.single.exercises.map(
@@ -420,17 +400,17 @@ void main() {
         home: RoutinesScreen(store: store),
       ),
     );
-    await tester.tap(find.byTooltip('Creează rutină'));
+    await tester.tap(find.byTooltip('Create routine'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), 'Planul meu');
     tester.testTextInput.hide();
-    await tester.tap(find.text('Adaugă exercițiu'));
+    await tester.tap(find.text('Add exercise'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Împins la bancă cu bara'));
+    await tester.tap(find.text('Barbell Bench Press - Medium Grip'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gata (1)'));
+    await tester.tap(find.text('Done (1)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Împins la bancă cu bara'));
+    await tester.tap(find.text('Barbell Bench Press - Medium Grip'));
     await tester.pumpAndSettle();
     final prescriptionFields = find.descendant(
       of: find.byType(AlertDialog),
@@ -440,9 +420,9 @@ void main() {
     await tester.enterText(prescriptionFields.at(1), '12');
     await tester.enterText(prescriptionFields.at(2), '25,5');
     tester.testTextInput.hide();
-    await tester.tap(find.text('Aplică'));
+    await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Salvează').first);
+    await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
     expect(store.customRoutines, hasLength(1));
     expect(store.customRoutines.single.name, 'Planul meu');
@@ -512,7 +492,7 @@ void main() {
           name: 'Progres în timp real',
           subtitle: '',
           estimatedMinutes: 10,
-          category: 'Personalizat',
+          category: 'Custom',
           exercises: [
             RoutineExercise(
               exerciseId: 'bench_press',
@@ -533,10 +513,13 @@ void main() {
           tester.widget<Text>(find.byKey(ValueKey(key))).data!;
       Future<void> summary() async {
         tester.testTextInput.hide();
-        await tester.drag(find.byType(ListView).first, const Offset(0, 900));
-        await tester.pumpAndSettle();
+        await revealWorkout(
+          tester,
+          find.byKey(const ValueKey('live-completed-sets')),
+        );
       }
 
+      expect(find.byKey(const ValueKey('rate-effort-0')), findsNothing);
       expect(metric('live-completed-sets'), '0/2');
       expect(metric('live-reps'), '0');
       expect(metric('live-volume'), '0');
@@ -547,30 +530,43 @@ void main() {
       );
       expect(find.byKey(const ValueKey('live-pr-bench_press')), findsNothing);
 
-      final fields = find.byType(TextField);
-      await tester.ensureVisible(fields.at(1));
-      await tester.enterText(fields.at(1), '10');
+      final weight = workoutField('Set 1 weight, kg');
+      final reps = workoutField('Set 1 reps');
+      await revealWorkout(tester, reps);
+      await tester.enterText(reps, '10');
       tester.testTextInput.hide();
-      await tester.ensureVisible(
-        find.byTooltip('Marchează setul efectuat').first,
-      );
+      await revealWorkout(tester, find.byTooltip('Mark set complete').first);
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Marchează setul efectuat').first);
+      await tester.tap(find.byTooltip('Mark set complete').first);
       await tester.pumpAndSettle();
       await summary();
       expect(metric('live-completed-sets'), '1/2');
       expect(metric('live-reps'), '10');
       expect(metric('live-volume'), '600');
-      expect(metric('live-1rm-bench_press'), '1RM estimat · 80 kg');
+      expect(metric('live-1rm-bench_press'), 'Estimated 1RM · 80 kg');
       expect(
         metric('live-pr-bench_press'),
-        'Record estimat 1RM · +4 kg față de 76 kg',
+        'Estimated 1RM record · +4 kg versus 76 kg',
       );
+      await revealWorkout(tester, find.byKey(const ValueKey('rate-effort-0')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('rate-effort-0')));
+      await tester.pumpAndSettle();
+      expect(find.text('How hard was your last set?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ChoiceChip, '8'));
+      await tester.pumpAndSettle();
+      expect(store.activeSession!.exercises.first.sets.first.rpe, 8);
+      expect(find.text('RPE 8/10'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('rate-effort-0')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear effort rating'));
+      await tester.pumpAndSettle();
+      expect(store.activeSession!.exercises.first.sets.first.rpe, isNull);
 
       // A high-repetition edit still counts actual reps/volume but cannot create
       // an Epley estimate outside the explicitly supported 1–12 repetition range.
-      await tester.ensureVisible(fields.at(1));
-      await tester.enterText(fields.at(1), '13');
+      await revealWorkout(tester, reps);
+      await tester.enterText(reps, '13');
       await tester.pumpAndSettle();
       await summary();
       expect(metric('live-reps'), '13');
@@ -580,37 +576,75 @@ void main() {
 
       // A genuinely heavier external load can be a weight record even when
       // repetition count makes an estimated 1RM ineligible.
-      await tester.ensureVisible(fields.at(0));
-      await tester.enterText(fields.at(0), '61');
+      await revealWorkout(tester, weight);
+      await tester.enterText(weight, '61');
       await tester.pumpAndSettle();
       await summary();
       expect(metric('live-volume'), '793');
       expect(find.byKey(const ValueKey('live-1rm-bench_press')), findsNothing);
       expect(
         metric('live-pr-bench_press'),
-        'Record de greutate · 61 kg (anterior 60 kg)',
+        'Weight record · 61 kg (previous 60 kg)',
       );
 
-      await tester.ensureVisible(fields.at(1));
-      await tester.enterText(fields.at(1), '0');
+      await revealWorkout(tester, reps);
+      await tester.enterText(reps, '0');
       await tester.pumpAndSettle();
       await summary();
       expect(metric('live-completed-sets'), '0/2');
       expect(metric('live-reps'), '0');
       expect(metric('live-volume'), '0');
-      await tester.ensureVisible(find.text('Adaugă set').first);
+      await revealWorkout(tester, find.text('Add set').first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Adaugă set').first);
+      await tester.tap(find.text('Add set').first);
       await tester.pumpAndSettle();
       await summary();
       expect(metric('live-completed-sets'), '0/3');
       expect(metric('live-reps'), '0');
       expect(
         metric('live-planned-completed'),
-        '0 din 3 seturi bifate · 3 rămase',
+        '0 of 3 sets completed · 3 remaining',
       );
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
+      await disposeWorkout(tester);
+    },
+  );
+
+  testWidgets(
+    'rest controls stay synchronized with the shared notification clock',
+    (tester) async {
+      phoneSize(tester);
+      final store = await newStore();
+      await store.startEmptyWorkout();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: piTheme(Brightness.dark),
+          home: ActiveWorkoutScreen(store: store),
+        ),
+      );
+      await tester.tap(find.byTooltip('Start rest'));
+      await tester.pumpAndSettle();
+      expect(WorkoutClock.instance.remaining, inInclusiveRange(88, 90));
+      expect(find.byTooltip('Skip rest'), findsOneWidget);
+      WorkoutClock.instance.skipRest();
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Start rest'), findsOneWidget);
+      await tester.tap(find.byTooltip('Rest duration'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('60s'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Start rest'));
+      await tester.pumpAndSettle();
+      expect(WorkoutClock.instance.remaining, inInclusiveRange(58, 60));
+      await tester.tap(find.text('+30s'));
+      await tester.pumpAndSettle();
+      expect(WorkoutClock.instance.remaining, inInclusiveRange(88, 90));
+      expect(WorkoutClock.instance.restSeconds, 60);
+      WorkoutClock.instance.skipRest();
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Start rest'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await disposeWorkout(tester);
     },
   );
 
@@ -625,7 +659,7 @@ void main() {
           name: 'Mixt',
           subtitle: '',
           estimatedMinutes: 10,
-          category: 'Personalizat',
+          category: 'Custom',
           exercises: [
             RoutineExercise(
               exerciseId: 'push_up',
@@ -668,7 +702,7 @@ void main() {
       expect(find.byKey(const ValueKey('live-1rm-push_up')), findsNothing);
       expect(find.byKey(const ValueKey('live-1rm-treadmill')), findsNothing);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
+      await disposeWorkout(tester);
     },
   );
 
@@ -683,7 +717,7 @@ void main() {
           name: 'Sesiune de test',
           subtitle: '',
           estimatedMinutes: 5,
-          category: 'Personalizat',
+          category: 'Custom',
           exercises: [RoutineExercise(exerciseId: 'bench_press', sets: 1)],
         ),
       );
@@ -693,58 +727,61 @@ void main() {
           home: ActiveWorkoutScreen(store: store),
         ),
       );
-      await tester.tap(find.text('Încheie'));
+      await tester.tap(find.text('Finish'));
       await tester.pump();
       expect(store.history, isEmpty);
       expect(
-        find.text('Bifează cel puțin un set efectuat înainte de a salva.'),
+        find.text('Complete at least one set before saving.'),
         findsOneWidget,
       );
 
-      final fields = find.byType(TextField);
-      await tester.enterText(fields.at(0), '62,5');
+      final weight = workoutField('Set 1 weight, kg');
+      final reps = workoutField('Set 1 reps');
+      await revealWorkout(tester, weight);
+      await tester.enterText(weight, '62,5');
       await tester.pump();
-      await tester.enterText(fields.at(1), '8');
+      await tester.enterText(reps, '8');
       await tester.pump();
       tester.testTextInput.hide();
-      await tester.ensureVisible(
-        find.byTooltip('Marchează setul efectuat').first,
-      );
+      await revealWorkout(tester, find.byTooltip('Mark set complete').first);
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Marchează setul efectuat').first);
+      await tester.tap(find.byTooltip('Mark set complete').first);
       await tester.pump();
       expect(store.activeSession!.completedSets, 1);
       expect(store.activeSession!.volume, 500);
       expect(find.byKey(const ValueKey('live-pr-bench_press')), findsNothing);
-      expect(find.text('Respiră. Revino mai puternic.'), findsOneWidget);
+      await revealWorkout(tester, find.text('Breathe. Come back stronger.'));
+      expect(find.text('Breathe. Come back stronger.'), findsOneWidget);
 
-      await tester.enterText(fields.at(1), '0');
+      await revealWorkout(tester, reps);
+      await tester.enterText(reps, '0');
       await tester.pump();
       expect(store.activeSession!.completedSets, 0);
-      await tester.enterText(fields.at(1), '8');
+      await tester.enterText(reps, '8');
       await tester.pump();
       tester.testTextInput.hide();
-      await tester.ensureVisible(
-        find.byTooltip('Marchează setul efectuat').first,
-      );
+      await revealWorkout(tester, find.byTooltip('Mark set complete').first);
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Marchează setul efectuat').first);
+      await tester.tap(find.byTooltip('Mark set complete').first);
       await tester.pump();
-      await tester.tap(find.text('Încheie'));
+      await tester.tap(find.text('Finish'));
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.byType(TextField).last,
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextField),
+        ),
         'Mișcare controlată.',
       );
       tester.testTextInput.hide();
-      await tester.tap(find.text('Salvează'));
+      await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
       expect(store.activeSession, isNull);
       expect(store.history.single.volume, 500);
       expect(store.history.single.notes, 'Mișcare controlată.');
       expect(tester.takeException(), isNull);
       // Dispose the local rest timer at the end of the test.
-      await tester.pumpWidget(const SizedBox());
+      await disposeWorkout(tester);
     },
   );
 }

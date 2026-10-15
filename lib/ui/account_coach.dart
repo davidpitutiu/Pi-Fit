@@ -1,3 +1,4 @@
+export 'coach_screen.dart';
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,9 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/user_profile.dart';
-import '../services/coach_service.dart';
 import '../services/firebase_gateway.dart';
 import '../state/app_store.dart';
+import 'body_measurements_screen.dart';
+import 'export_screen.dart';
 import 'health_screen.dart';
 import 'theme.dart';
 
@@ -53,25 +55,25 @@ class _AccountScreenState extends State<AccountScreen> {
     if (authUid == null || accountId != authUid) {
       toast(
         context,
-        'Contul nu este încă pregătit. Conectează-te din nou înainte de restaurare.',
+        'Your account is not ready yet. Sign in again before restoring.',
       );
       return;
     }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Restaurezi backupul?'),
+        title: const Text('Restore your backup?'),
         content: const Text(
-          'Datele locale vor fi înlocuite cu backupul acestui cont. Exportă-le mai întâi dacă vrei să le păstrezi.',
+          'The backup will replace the local data for this account. Export it first if you want to keep a copy.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text('Anulează'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Restaurează'),
+            child: const Text('Restore'),
           ),
         ],
       ),
@@ -84,30 +86,30 @@ class _AccountScreenState extends State<AccountScreen> {
     await run(() async {
       if (gateway.currentUser?.uid != authUid ||
           widget.store.accountId != accountId) {
-        throw StateError('Contul s-a schimbat. Reîncearcă restaurarea.');
+        throw StateError('The account changed. Try restoring again.');
       }
       final data = await gateway.loadBackup();
       if (gateway.currentUser?.uid != authUid ||
           widget.store.accountId != accountId) {
-        throw StateError('Contul s-a schimbat. Reîncearcă restaurarea.');
+        throw StateError('The account changed. Try restoring again.');
       }
       if (data == null) {
-        throw StateError('Nu există încă un backup în acest cont.');
+        throw StateError('There is no backup in this account yet.');
       }
       await widget.store.restoreBackup(data, expectedAccountId: authUid);
-    }, 'Backup restaurat pe acest dispozitiv.');
+    }, 'Backup restored on this device.');
   }
 
   Future<void> saveBackup() => run(() async {
     final authUid = gateway.currentUser?.uid;
     if (authUid == null || widget.store.accountId != authUid) {
       throw StateError(
-        'Contul nu este încă pregătit. Conectează-te din nou înainte de backup.',
+        'Your account is not ready yet. Sign in again before backing up.',
       );
     }
     final data = widget.store.exportData();
     await gateway.saveBackup(data);
-  }, 'Backup salvat în cont.');
+  }, 'Backup saved to your account.');
 
   Future<void> deleteAccount() async {
     final authUid = gateway.currentUser?.uid;
@@ -117,34 +119,34 @@ class _AccountScreenState extends State<AccountScreen> {
     final password = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Șterge contul Pi Fit'),
+        title: const Text('Delete your Pi Fit account'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Contul Firebase și backupul său vor fi șterse definitiv. Exportă mai întâi jurnalul pe care vrei să îl păstrezi: copia locală a contului nu va mai putea fi deschisă prin autentificare după ștergere. Confirmă cu parola contului.',
+              'Your Firebase account and cloud backup will be permanently deleted. Export your journal first: its local copy cannot be reopened by signing in after deletion. Confirm with your account password.',
             ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Parola actuală'),
+              decoration: const InputDecoration(labelText: 'Current password'),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text('Anulează'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(c, controller.text),
-            child: const Text('Șterge definitiv'),
+            child: const Text('Delete permanently'),
           ),
         ],
       ),
     );
-    // The dialog route may still be animating with its controller attached.
+    // The dialog route may still be yearsmating with its controller attached.
     await Future<void>.delayed(const Duration(milliseconds: 250));
     controller.dispose();
     if (password == null ||
@@ -154,12 +156,12 @@ class _AccountScreenState extends State<AccountScreen> {
       return;
     }
     if (password.isEmpty) {
-      toast(context, 'Introdu parola actuală pentru a confirma.');
+      toast(context, 'Enter your current password to confirm.');
       return;
     }
     await run(
       () => gateway.deleteAccount(password),
-      'Contul și backupul cloud au fost șterse.',
+      'Your account and cloud backup have been deleted.',
     );
   }
 
@@ -170,18 +172,18 @@ class _AccountScreenState extends State<AccountScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Importă jurnalul local'),
+        title: const Text('Import guest journal'),
         content: const Text(
-          'Istoricul, rutinele, calendarul și favoritele profilului de oaspete vor fi adăugate la acest cont. Datele existente și copia de oaspete se păstrează. Profilul contului și antrenamentul activ rămân neschimbate. Backupul în cloud se face separat.',
+          'Guest workout history, routines, calendar, favorites and saved body measurements will be added to this account. Existing data and the guest copy are kept. Your profile and active workout remain unchanged. Cloud backup is a separate action.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text('Anulează'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Importă jurnalul'),
+            child: const Text('Import journal'),
           ),
         ],
       ),
@@ -194,7 +196,7 @@ class _AccountScreenState extends State<AccountScreen> {
     }
     await run(
       widget.store.importGuestJournal,
-      'Jurnalul local a fost importat în cont.',
+      'Guest journal imported into your account.',
     );
   }
 
@@ -202,7 +204,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       automaticallyImplyLeading: !widget.embedded,
-      title: const Text('Profilul tău'),
+      title: const Text('Your profile'),
     ),
     body: StreamBuilder<User?>(
       stream: gateway.authStateChanges,
@@ -212,6 +214,21 @@ class _AccountScreenState extends State<AccountScreen> {
           animation: widget.store,
           builder: (context, _) {
             final profile = widget.store.profile;
+            final completedWorkouts = widget.store.totalCompletedWorkouts;
+            final weights = widget.store.bodyMeasurements
+                .where((m) => m.weightKg != null)
+                .toList();
+            final latestWeight =
+                weights.firstOrNull?.weightKg ?? profile.weightKg;
+            final latestHeight =
+                widget.store.bodyMeasurements
+                    .where((m) => m.heightCm != null)
+                    .firstOrNull
+                    ?.heightCm ??
+                profile.heightCm;
+            final weightChange = weights.length < 2
+                ? null
+                : weights.first.weightKg! - weights[1].weightKg!;
             return PageBody(
               children: [
                 PiCard(
@@ -244,10 +261,19 @@ class _AccountScreenState extends State<AccountScreen> {
                             const SizedBox(height: 4),
                             Text(
                               user?.email ??
-                                  'Profil local · salvat pe dispozitiv',
+                                  'Guest profile · saved on this device',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: PiColors.muted(context),
+                              ),
+                            ),
+                            const SizedBox(height: 7),
+                            Text(
+                              '$completedWorkouts ${completedWorkouts == 1 ? 'workout' : 'workouts'} completed',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
                           ],
@@ -284,7 +310,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Activitate și sănătate',
+                              'Health and activity',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 15,
@@ -292,7 +318,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Pași, energie și antrenamente',
+                              'Steps, measurements and heart rate',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: PiColors.muted(context),
@@ -300,7 +326,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Citire locală · doar cu permisiunea ta',
+                              'Local access · only with your permission',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: PiColors.muted(context),
@@ -322,33 +348,33 @@ class _AccountScreenState extends State<AccountScreen> {
                       children: [
                         const _Eyebrow(
                           icon: Icons.fingerprint_rounded,
-                          text: 'CONTUL TĂU PI FIT',
+                          text: 'YOUR PI FIT ACCOUNT',
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Progresul tău merită\nun loc sigur.',
+                          'Your progress deserves\na safe place.',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Conectează-te pentru backup în cloud și acces la Pi Coach online când serviciul este configurat.',
+                          'Sign in for cloud backup and Pi Coach online when the service is available.',
                           style: TextStyle(color: PiColors.muted(context)),
                         ),
                         const SizedBox(height: 18),
                         FilledButton.icon(
                           onPressed: () => _openAuth(false),
                           icon: const Icon(Icons.login_rounded),
-                          label: const Text('Conectează-te'),
+                          label: const Text('Sign in'),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton(
                           onPressed: () => _openAuth(true),
-                          child: const Text('Creează un cont'),
+                          child: const Text('Create an account'),
                         ),
                         if (!gateway.configured) ...[
                           const SizedBox(height: 12),
                           const Text(
-                            'Conectarea nu a pornit încă. Configurația Firebase este inclusă; verifică internetul și repornește aplicația. Jurnalul local rămâne disponibil.',
+                            'Sign-in has not started yet. Firebase configuration is included; check your connection and restart the app. Your local journal is available.',
                             style: TextStyle(fontSize: 12),
                           ),
                         ],
@@ -365,63 +391,61 @@ class _AccountScreenState extends State<AccountScreen> {
                               ? Icons.verified_user_outlined
                               : Icons.mark_email_unread_outlined,
                           text: user.emailVerified
-                              ? 'CONT CONECTAT'
-                              : 'CONFIRMĂ ADRESA DE EMAIL',
+                              ? 'SIGNED IN'
+                              : 'VERIFY YOUR EMAIL',
                         ),
                         if (!user.emailVerified) ...[
                           const SizedBox(height: 10),
                           const Text(
-                            'Verifică mesajul de confirmare primit pe email.',
+                            'Check your inbox for the verification email.',
                           ),
                           TextButton(
                             onPressed: busy
                                 ? null
                                 : () => run(
                                     gateway.resendVerification,
-                                    'Email de confirmare retrimis.',
+                                    'Verification email sent again.',
                                   ),
-                            child: const Text(
-                              'Retrimite emailul de verificare',
-                            ),
+                            child: const Text('Resend verification email'),
                           ),
                           TextButton(
                             onPressed: busy
                                 ? null
                                 : () => run(
                                     user.reload,
-                                    'Starea adresei de email a fost actualizată.',
+                                    'Email verification status refreshed.',
                                   ),
-                            child: const Text('Am verificat emailul'),
+                            child: const Text('I verified my email'),
                           ),
                         ],
                         const SizedBox(height: 12),
                         const Text(
-                          'Backupul este manual. Încărcarea înlocuiește backupul contului; restaurarea înlocuiește datele locale.',
+                          'Backup is manual. Uploading replaces your cloud backup; restoring replaces the local data for this account.',
                         ),
                         const SizedBox(height: 14),
                         FilledButton.icon(
                           onPressed: busy ? null : saveBackup,
                           icon: const Icon(Icons.cloud_upload_outlined),
-                          label: const Text('Salvează backup în cloud'),
+                          label: const Text('Save cloud backup'),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed: busy ? null : restore,
                           icon: const Icon(Icons.cloud_download_outlined),
-                          label: const Text('Restaurează din cloud'),
+                          label: const Text('Restore from cloud'),
                         ),
                         if (widget.store.hasGuestJournal) ...[
                           const SizedBox(height: 10),
                           const Divider(),
                           const SizedBox(height: 8),
                           const Text(
-                            'Ai antrenamente în profilul de oaspete? Poți adăuga o copie la jurnalul acestui cont.',
+                            'Have workouts in your guest profile? Add a copy to this account.',
                           ),
                           const SizedBox(height: 10),
                           OutlinedButton.icon(
                             onPressed: busy ? null : importGuestJournal,
                             icon: const Icon(Icons.move_to_inbox_outlined),
-                            label: const Text('Importă jurnalul local'),
+                            label: const Text('Import guest journal'),
                           ),
                         ],
                         TextButton(
@@ -429,9 +453,9 @@ class _AccountScreenState extends State<AccountScreen> {
                               ? null
                               : () => run(
                                   gateway.signOut,
-                                  'Te-ai deconectat. Profilul de oaspete este activ; jurnalul contului este păstrat separat.',
+                                  'Signed out. Your guest profile is active; the account journal is kept separately.',
                                 ),
-                          child: const Text('Deconectează-te'),
+                          child: const Text('Sign out'),
                         ),
                         if (busy) const LinearProgressIndicator(),
                       ],
@@ -439,8 +463,8 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ],
                 SectionHeading(
-                  title: 'Profil de antrenament',
-                  action: 'Editează',
+                  title: 'Training profile',
+                  action: 'Edit',
                   onAction: () => editTrainingProfile(context, widget.store),
                 ),
                 PiCard(
@@ -462,16 +486,16 @@ class _AccountScreenState extends State<AccountScreen> {
                           ),
                           _DetailPill(
                             icon: Icons.calendar_month_outlined,
-                            text: '${profile.sessionsPerWeek} zile / săpt.',
+                            text: '${profile.sessionsPerWeek} days / week',
                           ),
                           _DetailPill(
                             icon: Icons.timer_outlined,
-                            text: '${profile.sessionMinutes} min / ședință',
+                            text: '${profile.sessionMinutes} min / workout',
                           ),
                           if (profile.age != null)
                             _DetailPill(
                               icon: Icons.person_outline,
-                              text: '${profile.age} ani',
+                              text: '${profile.age} years',
                             ),
                           if (profile.heightCm != null)
                             _DetailPill(
@@ -488,17 +512,19 @@ class _AccountScreenState extends State<AccountScreen> {
                       const SizedBox(height: 14),
                       Text(
                         profile.equipment.isEmpty
-                            ? 'Adaugă echipamentul disponibil pentru recomandări mai potrivite.'
-                            : 'Echipament: ${profile.equipment.join(', ')}',
+                            ? 'Add your available equipment for more relevant suggestions.'
+                            : 'Equipment: ${profile.equipment.join(', ')}',
                         style: TextStyle(color: PiColors.muted(context)),
                       ),
                       if (profile.limitations.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        Text('Preferințe și limitări: ${profile.limitations}'),
+                        Text(
+                          'Preferences and limitations: ${profile.limitations}',
+                        ),
                       ],
                       const SizedBox(height: 8),
                       Text(
-                        'Detaliile fizice sunt opționale. Nu sunt folosite pentru a calcula scorul de consecvență.',
+                        'Body details are optional and do not affect your consistency score.',
                         style: TextStyle(
                           fontSize: 12,
                           color: PiColors.muted(context),
@@ -507,7 +533,72 @@ class _AccountScreenState extends State<AccountScreen> {
                     ],
                   ),
                 ),
-                const SectionHeading(title: 'Preferințe'),
+                SectionHeading(
+                  title: 'Body measurements',
+                  action: 'View',
+                  onAction: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          BodyMeasurementsScreen(store: widget.store),
+                    ),
+                  ),
+                ),
+                PiCard(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          BodyMeasurementsScreen(store: widget.store),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _DetailPill(
+                            icon: Icons.monitor_weight_outlined,
+                            text: latestWeight == null
+                                ? 'Add weight'
+                                : '${_number(latestWeight)} kg',
+                          ),
+                          _DetailPill(
+                            icon: Icons.height_rounded,
+                            text: latestHeight == null
+                                ? 'Add height'
+                                : '${_number(latestHeight)} cm',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        weightChange == null
+                            ? 'Save measurements to see your change over time.'
+                            : '${weightChange > 0 ? '+' : ''}${_number(double.parse(weightChange.toStringAsFixed(1)))} kg since your previous weight record.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: PiColors.muted(context),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                BodyMeasurementsScreen(store: widget.store),
+                          ),
+                        ),
+                        icon: const Icon(Icons.show_chart_rounded),
+                        label: const Text('Track measurements'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SectionHeading(title: 'Preferences'),
                 PiCard(
                   child: Column(
                     children: [
@@ -517,7 +608,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
-                              'Aspect',
+                              'Appearance',
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -535,14 +626,14 @@ class _AccountScreenState extends State<AccountScreen> {
                               ),
                               DropdownMenuItem(
                                 value: ThemeMode.system,
-                                child: Text('Sistem'),
+                                child: Text('System'),
                               ),
                             ],
                             onChanged: (v) {
                               if (v != null) {
                                 run(
                                   () => widget.store.setTheme(v),
-                                  'Aspect actualizat.',
+                                  'Appearance updated.',
                                 );
                               }
                             },
@@ -552,9 +643,9 @@ class _AccountScreenState extends State<AccountScreen> {
                       const Divider(height: 26),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Personalizare Pi Coach online'),
+                        title: const Text('Personalize Pi Coach online'),
                         subtitle: const Text(
-                          'Permite trimiterea profilului și a unui rezumat al jurnalului către serviciul AI când trimiți mesaje. Poți retrage acordul oricând.',
+                          'Allow your profile and a journal summary to be sent to the AI service when you send a message. You can withdraw permission at any time.',
                         ),
                         value: profile.coachConsent,
                         onChanged: busy
@@ -564,22 +655,33 @@ class _AccountScreenState extends State<AccountScreen> {
                                   profile.copyWith(coachConsent: v),
                                 ),
                                 v
-                                    ? 'Personalizarea AI online este permisă.'
-                                    : 'Pi Coach va folosi recomandări locale.',
+                                    ? 'Online AI personalization enabled.'
+                                    : 'Pi Coach will use local suggestions.',
                               ),
                       ),
                     ],
                   ),
                 ),
-                const SectionHeading(title: 'Date și confidențialitate'),
+                const SectionHeading(title: 'Data and privacy'),
                 PiCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Text(
-                        'Profilul de oaspete și fiecare cont au jurnale locale separate. Conectarea deschide doar datele contului tău; jurnalul de oaspete nu este importat automat. Îl poți accesa din nou prin deconectare sau poți importa o copie în cont. Deconectarea păstrează copia locală a contului, vizibilă când revii în același cont.',
+                        'Guest profiles and accounts have separate local journals. Signing in opens only that account; guest data is never imported automatically. Sign out to return to the guest profile, or import a copy into your account. Signing out preserves your account journal for your next sign-in.',
                       ),
                       const SizedBox(height: 14),
+                      FilledButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => ExportScreen(store: widget.store),
+                          ),
+                        ),
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        label: const Text('Export a progress report'),
+                      ),
+                      const SizedBox(height: 10),
                       OutlinedButton.icon(
                         onPressed: () => run(
                           () => Clipboard.setData(
@@ -589,16 +691,16 @@ class _AccountScreenState extends State<AccountScreen> {
                               ).convert(widget.store.exportData()),
                             ),
                           ),
-                          'Export JSON copiat. Salvează-l într-un loc sigur.',
+                          'JSON backup copied. Save it somewhere safe.',
                         ),
                         icon: const Icon(Icons.ios_share_rounded),
-                        label: const Text('Copiază exportul JSON'),
+                        label: const Text('Copy JSON backup'),
                       ),
                       if (user != null)
                         TextButton(
                           onPressed: busy ? null : deleteAccount,
                           child: Text(
-                            'Șterge contul și backupul cloud',
+                            'Delete account and cloud backup',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,
                             ),
@@ -649,7 +751,7 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     register = widget.initialRegister;
-    name.text = widget.store.name == 'Atlet' ? '' : widget.store.name;
+    name.text = widget.store.name == 'Athlete' ? '' : widget.store.name;
   }
 
   @override
@@ -662,12 +764,13 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> submit() async {
+    if (busy) return;
     if (!form.currentState!.validate()) return;
     if (!gateway.configured) {
       setState(
         () => error =
             gateway.configurationIssue ??
-            'Firebase nu a putut porni. Configurația este inclusă; verifică conexiunea și repornește aplicația. Modul local rămâne disponibil.',
+            'Firebase could not start. Configuration is included; check your connection and restart the app. Local mode is available.',
       );
       return;
     }
@@ -697,7 +800,7 @@ class _AuthScreenState extends State<AuthScreen> {
           await widget.store.updateProfile(requestedName, widget.store.goal);
         } catch (_) {
           profileWarning =
-              'Cont creat. Numele nu a putut fi salvat local; îl poți actualiza din Profil. Verifică și emailul de confirmare.';
+              'Account created. Your name could not be saved locally; update it in Profile. Check your verification email too.';
         }
       } else {
         operationUid = await gateway.signIn(email.text, password.text);
@@ -711,8 +814,8 @@ class _AuthScreenState extends State<AuthScreen> {
           context,
           profileWarning ??
               (register
-                  ? 'Cont creat. Verifică emailul de confirmare.'
-                  : 'Bine ai revenit în Pi Fit.'),
+                  ? 'Account created. Check your verification email.'
+                  : 'Welcome back to Pi Fit.'),
         );
         Navigator.of(context).pop();
       }
@@ -730,14 +833,15 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> resetPassword() async {
+    if (busy) return;
     if (_validateEmail(email.text) != null) {
-      setState(() => error = 'Introdu mai întâi o adresă de email validă.');
+      setState(() => error = 'Enter a valid email address first.');
       return;
     }
     if (!gateway.configured) {
       setState(
         () => error =
-            'Firebase nu este disponibil momentan. Verifică conexiunea și repornește aplicația pentru resetarea parolei.',
+            'Firebase is temporarily unavailable. Check your connection and restart the app to reset your password.',
       );
       return;
     }
@@ -750,7 +854,7 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) {
         toast(
           context,
-          'Dacă există un cont cu această adresă, vei primi instrucțiuni de resetare.',
+          'If an account exists for this address, you will receive password reset instructions.',
         );
       }
     } catch (e) {
@@ -777,25 +881,25 @@ class _AuthScreenState extends State<AuthScreen> {
                   children: [
                     const _Eyebrow(
                       icon: Icons.bolt_rounded,
-                      text: 'MAI MULTĂ PUTERE. ÎMPREUNĂ.',
+                      text: 'STRONGER. TOGETHER.',
                     ),
                     const SizedBox(height: 22),
                     Text(
-                      register ? 'Începe cu tine.' : 'Bine ai\nrevenit.',
+                      register ? 'It starts with you.' : 'Welcome\nback.',
                       style: Theme.of(context).textTheme.headlineLarge,
                     ),
                     const SizedBox(height: 12),
                     Text(
                       register
-                          ? 'Un cont pentru progresul pe care îl construiești, antrenament cu antrenament.'
-                          : 'Intră în cont și păstrează-ți antrenamentele aproape.',
+                          ? 'One account for the progress you build, workout by workout.'
+                          : 'Sign in and keep your training close.',
                       style: TextStyle(color: PiColors.muted(context)),
                     ),
                     const SizedBox(height: 24),
                     SegmentedButton<bool>(
                       segments: const [
-                        ButtonSegment(value: false, label: Text('Conectare')),
-                        ButtonSegment(value: true, label: Text('Cont nou')),
+                        ButtonSegment(value: false, label: Text('Sign in')),
+                        ButtonSegment(value: true, label: Text('New account')),
                       ],
                       selected: {register},
                       onSelectionChanged: busy
@@ -815,13 +919,13 @@ class _AuthScreenState extends State<AuthScreen> {
                         autofillHints: const [AutofillHints.name],
                         textCapitalization: TextCapitalization.words,
                         decoration: const InputDecoration(
-                          labelText: 'Nume',
+                          labelText: 'Name',
                           prefixIcon: Icon(Icons.person_outline_rounded),
                         ),
                         validator: (v) => v == null || v.trim().isEmpty
-                            ? 'Introdu numele tău.'
+                            ? 'Enter your name.'
                             : v.trim().length > 60
-                            ? 'Folosește cel mult 60 de caractere.'
+                            ? 'Use at most 60 characters.'
                             : null,
                       ),
                       const SizedBox(height: 14),
@@ -849,11 +953,11 @@ class _AuthScreenState extends State<AuthScreen> {
                             : AutofillHints.password,
                       ],
                       decoration: InputDecoration(
-                        labelText: 'Parolă',
-                        helperText: register ? 'Cel puțin 8 caractere.' : null,
+                        labelText: 'Password',
+                        helperText: register ? 'At least 8 characters.' : null,
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         suffixIcon: IconButton(
-                          tooltip: obscure ? 'Arată parola' : 'Ascunde parola',
+                          tooltip: obscure ? 'Show password' : 'Hide password',
                           onPressed: () => setState(() => obscure = !obscure),
                           icon: Icon(
                             obscure
@@ -863,9 +967,9 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                       validator: (v) => v == null || v.isEmpty
-                          ? 'Introdu parola.'
+                          ? 'Enter your password.'
                           : v.length < 8
-                          ? 'Parola trebuie să aibă cel puțin 8 caractere.'
+                          ? 'Your password must contain at least 8 characters.'
                           : null,
                       onFieldSubmitted: (_) {
                         if (!register) submit();
@@ -879,12 +983,12 @@ class _AuthScreenState extends State<AuthScreen> {
                         obscureText: obscure,
                         autofillHints: const [AutofillHints.newPassword],
                         decoration: const InputDecoration(
-                          labelText: 'Confirmă parola',
+                          labelText: 'Confirm password',
                           prefixIcon: Icon(Icons.lock_outline_rounded),
                         ),
                         validator: (v) =>
                             v != password.text || v == null || v.isEmpty
-                            ? 'Parolele trebuie să coincidă.'
+                            ? 'Passwords must match.'
                             : null,
                         onFieldSubmitted: (_) => submit(),
                       ),
@@ -893,7 +997,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: busy ? null : resetPassword,
-                          child: const Text('Ai uitat parola?'),
+                          child: const Text('Forgot password?'),
                         ),
                       ),
                     if (error != null) ...[
@@ -918,7 +1022,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               width: 22,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(register ? 'Creează cont' : 'Conectează-te'),
+                          : Text(register ? 'Create account' : 'Sign in'),
                     ),
                     const SizedBox(height: 20),
                     if (!gateway.configured)
@@ -931,7 +1035,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Mod local activ. Configurația Firebase este inclusă. Dacă autentificarea nu pornește, verifică internetul și repornește aplicația.',
+                                'Local mode is active. Firebase configuration is included. If sign-in does not start, check your connection and restart the app.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: PiColors.muted(context),
@@ -943,7 +1047,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     const SizedBox(height: 18),
                     Text(
-                      'Fiecare cont are un jurnal local separat. Datele de oaspete nu sunt importate automat. Backupul în cont se face explicit din Profil.',
+                      'Each account has its own local journal. Guest data is never imported automatically. Create a cloud backup explicitly from Profile.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
@@ -964,13 +1068,13 @@ class _AuthScreenState extends State<AuthScreen> {
 String? _validateEmail(String? value) =>
     value == null ||
         !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value.trim())
-    ? 'Introdu o adresă de email validă.'
+    ? 'Enter a valid email address.'
     : null;
 
 String _readableError(Object error) {
   if (error is! FirebaseAuthException) {
     if (error.toString().contains('permission-denied')) {
-      return 'Accesul la datele cloud a fost refuzat. Verifică regulile Firestore pentru contul tău înainte de a reîncerca.';
+      return 'Access to cloud data was denied. Check the Firestore rules for your account before trying again.';
     }
     return error
         .toString()
@@ -978,22 +1082,20 @@ String _readableError(Object error) {
         .replaceFirst('Invalid argument(s): ', '');
   }
   return switch (error.code) {
-    'invalid-email' => 'Adresa de email nu este validă.',
-    'weak-password' => 'Folosește o parolă de cel puțin 8 caractere.',
-    'email-already-in-use' => 'Există deja un cont cu această adresă.',
+    'invalid-email' => 'The email address is invalid.',
+    'weak-password' => 'Use a password with at least 8 characters.',
+    'email-already-in-use' => 'An account already exists for this email.',
     'invalid-credential' ||
     'wrong-password' ||
-    'user-not-found' => 'Emailul sau parola nu sunt corecte.',
-    'too-many-requests' => 'Prea multe încercări. Revino în câteva minute.',
-    'network-request-failed' =>
-      'Verifică conexiunea la internet și încearcă din nou.',
+    'user-not-found' => 'The email or password is incorrect.',
+    'too-many-requests' => 'Too many attempts. Try again in a few minutes.',
+    'network-request-failed' => 'Check your internet connection and try again.',
     'operation-not-allowed' =>
-      'Activează Email/Password în Firebase Authentication.',
-    'requires-recent-login' =>
-      'Conectează-te din nou pentru a confirma această operație.',
+      'Enable Email/Password in Firebase Authentication.',
+    'requires-recent-login' => 'Sign in again to confirm this action.',
     'app-not-authorized' || 'invalid-api-key' =>
-      'Verifică înregistrarea aplicației și configurația Firebase.',
-    _ => 'Operația nu a reușit (${error.code}).',
+      'Check the app registration and Firebase configuration.',
+    _ => 'The action failed (${error.code}).',
   };
 }
 
@@ -1055,13 +1157,14 @@ class _ProfileEditorState extends State<_ProfileEditor> {
   }
 
   Future<void> save() async {
+    if (busy) return;
     bool sameScope() =>
         mounted &&
         widget.store.accountId == _editingAccountId &&
         FirebaseGateway.instance.currentUser?.uid == _editingAuthUid;
     if (!sameScope()) return;
     if (!form.currentState!.validate()) {
-      toast(context, 'Verifică valorile marcate în formular.');
+      toast(context, 'Check the highlighted values.');
       return;
     }
     setState(() => busy = true);
@@ -1086,7 +1189,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
         newGoal: goal,
       );
       if (mounted && sameScope()) {
-        toast(context, 'Profil de antrenament salvat.');
+        toast(context, 'Training profile saved.');
         Navigator.pop(context);
       }
     } catch (e) {
@@ -1109,13 +1212,13 @@ class _ProfileEditorState extends State<_ProfileEditor> {
               children: [
                 Expanded(
                   child: Text(
-                    'Planul începe cu tine',
+                    'Your plan starts with you',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  tooltip: 'Închide',
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close_rounded),
                 ),
               ],
@@ -1130,25 +1233,25 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Completează doar ce vrei să folosească Pi Coach. Poți modifica sau șterge detaliile oricând.',
+                      'Share only what you want Pi Coach to use. You can edit or clear these details any time.',
                       style: TextStyle(color: PiColors.muted(context)),
                     ),
-                    const SectionHeading(title: 'Tu și obiectivul tău'),
+                    const SectionHeading(title: 'You and your goal'),
                     TextFormField(
                       key: const Key('profile-name'),
                       controller: name,
-                      decoration: const InputDecoration(labelText: 'Nume'),
+                      decoration: const InputDecoration(labelText: 'Name'),
                       validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Introdu un nume.'
+                          ? 'Enter a name.'
                           : v.trim().length > 60
-                          ? 'Maximum 60 de caractere.'
+                          ? 'At most 60 characters.'
                           : null,
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
                       initialValue: goal,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Obiectiv'),
+                      decoration: const InputDecoration(labelText: 'Goal'),
                       items: AppStore.profileGoals
                           .map(
                             (g) => DropdownMenuItem(
@@ -1166,7 +1269,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     DropdownButtonFormField<String>(
                       initialValue: experience,
                       decoration: const InputDecoration(
-                        labelText: 'Experiență',
+                        labelText: 'Experience',
                       ),
                       items: UserProfile.experiences
                           .map(
@@ -1175,9 +1278,9 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                           .toList(),
                       onChanged: (v) => setState(() => experience = v!),
                     ),
-                    const SectionHeading(title: 'Ritmul tău'),
+                    const SectionHeading(title: 'Your training rhythm'),
                     _StepperRow(
-                      label: 'Antrenamente / săptămână',
+                      label: 'Workouts / week',
                       value: '$sessions',
                       minus: sessions > 1
                           ? () => setState(() => sessions--)
@@ -1188,7 +1291,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     ),
                     const SizedBox(height: 12),
                     _StepperRow(
-                      label: 'Minute / antrenament',
+                      label: 'Minutes / workout',
                       value: '$minutes',
                       minus: minutes > 15
                           ? () => setState(
@@ -1203,7 +1306,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Zile preferate',
+                      'Preferred days',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
@@ -1214,7 +1317,15 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                         7,
                         (i) => FilterChip(
                           label: Text(
-                            const ['Lu', 'Ma', 'Mi', 'Jo', 'Vi', 'Sâ', 'Du'][i],
+                            const [
+                              'Mon',
+                              'Tue',
+                              'Wed',
+                              'Thu',
+                              'Fri',
+                              'Sat',
+                              'Sun',
+                            ][i],
                           ),
                           selected: days.contains(i + 1),
                           onSelected: (v) => setState(() {
@@ -1225,26 +1336,26 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Preferințele nu programează automat antrenamente. Folosește Calendar pentru date și remindere.',
+                      'Preferences do not schedule workouts automatically. Use Calendar for dates and reminders.',
                       style: TextStyle(
                         fontSize: 12,
                         color: PiColors.muted(context),
                       ),
                     ),
-                    const SectionHeading(title: 'Echipament disponibil'),
+                    const SectionHeading(title: 'Available equipment'),
                     Wrap(
                       spacing: 7,
                       runSpacing: 5,
                       children:
                           {
                                 ...equipment,
-                                'Sală completă',
-                                'Gantere',
-                                'Bară',
-                                'Aparate',
-                                'Cablu',
-                                'Greutatea corpului',
-                                'Benzi elastice',
+                                'Full gym',
+                                'Dumbbells',
+                                'Barbell',
+                                'Machines',
+                                'Cable',
+                                'Bodyweight',
+                                'Resistance bands',
                                 'Kettlebell',
                               }
                               .map(
@@ -1258,10 +1369,10 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                               )
                               .toList(),
                     ),
-                    const SectionHeading(title: 'Detalii opționale'),
+                    const SectionHeading(title: 'Optional details'),
                     _optionalNumber(
                       age,
-                      'Vârstă (ani)',
+                      'Age (years)',
                       13,
                       100,
                       integer: true,
@@ -1270,7 +1381,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     const SizedBox(height: 12),
                     _optionalNumber(
                       height,
-                      'Înălțime (cm)',
+                      'Height (cm)',
                       100,
                       250,
                       keyName: 'profile-height',
@@ -1278,10 +1389,18 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     const SizedBox(height: 12),
                     _optionalNumber(
                       weight,
-                      'Greutate (kg)',
+                      'Weight (kg)',
                       25,
                       350,
                       keyName: 'profile-weight',
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Changing weight or height saves a dated measurement automatically. Clearing a field keeps the measurement history.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: PiColors.muted(context),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -1291,16 +1410,16 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                       maxLines: 4,
                       maxLength: 1500,
                       decoration: const InputDecoration(
-                        labelText: 'Preferințe sau limitări',
+                        labelText: 'Preferences or limitations',
                         hintText:
-                            'Ex.: prefer aparatele; evit mișcările deasupra capului.',
+                            'For example: I prefer machines and avoid overhead movements.',
                       ),
                       validator: (v) => (v?.length ?? 0) > 1500
-                          ? 'Maximum 1.500 de caractere.'
+                          ? 'At most 1,500 characters.'
                           : null,
                     ),
                     Text(
-                      'Pi Coach nu poate diagnostica afecțiuni. Pentru durere sau recuperare după o accidentare, cere sfatul unui specialist.',
+                      'Pi Coach cannot diagnose conditions. For pain or injury recovery, consult a qualified professional.',
                       style: TextStyle(
                         fontSize: 12,
                         color: PiColors.muted(context),
@@ -1320,7 +1439,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                 child: FilledButton(
                   key: const Key('save-training-profile'),
                   onPressed: busy ? null : save,
-                  child: Text(busy ? 'Se salvează…' : 'Salvează profilul'),
+                  child: Text(busy ? 'Saving…' : 'Save profile'),
                 ),
               ),
             ),
@@ -1343,7 +1462,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
     keyboardType: TextInputType.numberWithOptions(decimal: !integer),
     decoration: InputDecoration(
       labelText: label,
-      helperText: 'Opțional · $min–$max',
+      helperText: 'Optional · $min–$max',
     ),
     validator: (v) {
       if (v == null || v.trim().isEmpty) return null;
@@ -1353,7 +1472,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
           n < min ||
           n > max ||
           (integer && n != n.roundToDouble())) {
-        return 'Introdu ${integer ? 'un număr întreg' : 'o valoare'} între $min și $max.';
+        return 'Enter ${integer ? 'a whole number' : 'a value'} between $min and $max.';
       }
       return null;
     },
@@ -1381,7 +1500,7 @@ class _StepperRow extends StatelessWidget {
       Expanded(child: Text(label)),
       IconButton(
         onPressed: minus,
-        tooltip: 'Redu $label',
+        tooltip: 'Decrease $label',
         icon: const Icon(Icons.remove_circle_outline_rounded),
       ),
       Text(
@@ -1390,7 +1509,7 @@ class _StepperRow extends StatelessWidget {
       ),
       IconButton(
         onPressed: plus,
-        tooltip: 'Crește $label',
+        tooltip: 'Increase $label',
         icon: const Icon(Icons.add_circle_outline_rounded),
       ),
     ],
@@ -1443,464 +1562,5 @@ class _DetailPill extends StatelessWidget {
         ),
       ],
     ),
-  );
-}
-
-class CoachScreen extends StatefulWidget {
-  final AppStore store;
-  const CoachScreen({super.key, required this.store});
-  @override
-  State<CoachScreen> createState() => _CoachScreenState();
-}
-
-class _CoachScreenState extends State<CoachScreen> {
-  final input = TextEditingController(), scroll = ScrollController();
-  final service = CoachService();
-  final List<({String text, bool user})> messages = [];
-  bool busy = false;
-  String? _conversationAccountId;
-  int _requestGeneration = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _conversationAccountId = widget.store.accountId;
-    widget.store.addListener(_accountChanged);
-  }
-
-  void _accountChanged() {
-    if (_conversationAccountId == widget.store.accountId) return;
-    _conversationAccountId = widget.store.accountId;
-    _requestGeneration++;
-    input.clear();
-    setState(() {
-      messages.clear();
-      busy = false;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (scroll.hasClients) scroll.jumpTo(0);
-    });
-  }
-
-  @override
-  void didUpdateWidget(CoachScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.store != widget.store) {
-      oldWidget.store.removeListener(_accountChanged);
-      widget.store.addListener(_accountChanged);
-      _accountChanged();
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.store.removeListener(_accountChanged);
-    input.dispose();
-    scroll.dispose();
-    super.dispose();
-  }
-
-  Future<void> send([String? suggestion]) async {
-    final question = (suggestion ?? input.text).trim();
-    if (question.isEmpty || busy) return;
-    final generation = ++_requestGeneration;
-    final history = messages
-        .skip(messages.length > 12 ? messages.length - 12 : 0)
-        .map((m) => {'role': m.user ? 'user' : 'assistant', 'content': m.text})
-        .toList();
-    setState(() {
-      messages.add((text: question, user: true));
-      busy = true;
-      input.clear();
-    });
-    _bottom();
-    try {
-      final reply = await service.reply(
-        question,
-        context: widget.store.coachContext,
-        localContext: widget.store.localCoachContext,
-        history: history,
-        allowRemote:
-            widget.store.profile.coachConsent &&
-            FirebaseGateway.instance.currentUser != null,
-      );
-      if (mounted && generation == _requestGeneration) {
-        setState(() => messages.add((text: reply, user: false)));
-      }
-    } catch (e) {
-      if (mounted && generation == _requestGeneration) {
-        setState(() => messages.add((text: _readableError(e), user: false)));
-      }
-    } finally {
-      if (mounted && generation == _requestGeneration) {
-        setState(() => busy = false);
-        _bottom();
-      }
-    }
-  }
-
-  void _bottom() => WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (scroll.hasClients) {
-      scroll.animateTo(
-        scroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
-    }
-  });
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.store,
-    builder: (context, _) {
-      final profile = widget.store.profile;
-      final online =
-          service.remoteConfigured &&
-          profile.coachConsent &&
-          FirebaseGateway.instance.currentUser != null;
-      return Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 920),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 20, 22, 12),
-                    child: Row(
-                      children: [
-                        if (Navigator.of(context).canPop())
-                          IconButton.filled(
-                            onPressed: () => Navigator.maybePop(context),
-                            tooltip: 'Înapoi',
-                            style: IconButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              backgroundColor: PiColors.lime,
-                              foregroundColor: const Color(0xFF172000),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                            icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: PiColors.lime,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Icon(
-                              Icons.auto_awesome_rounded,
-                              color: Color(0xFF172000),
-                            ),
-                          ),
-                        const SizedBox(width: 13),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Pi Coach',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineMedium,
-                              ),
-                              Text(
-                                online
-                                    ? 'AI online · personalizat pentru tine'
-                                    : 'Coach local · adaptat profilului',
-                                style: TextStyle(
-                                  color: PiColors.muted(context),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () =>
-                              editTrainingProfile(context, widget.store),
-                          tooltip: 'Personalizează profilul',
-                          icon: const Icon(Icons.tune_rounded),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView(
-                      controller: scroll,
-                      padding: const EdgeInsets.fromLTRB(22, 12, 22, 20),
-                      children: [
-                        if (messages.isEmpty) ...[
-                          Text(
-                            'Un plan care\nține cont de tine.',
-                            style: Theme.of(context).textTheme.headlineLarge,
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            'Obiectiv, timp, echipament și antrenamente reale. Începem cu ce ai, apoi ajustăm pas cu pas.',
-                            style: TextStyle(color: PiColors.muted(context)),
-                          ),
-                          const SizedBox(height: 22),
-                          PiCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _Eyebrow(
-                                  icon: Icons.person_outline_rounded,
-                                  text: 'CE FOLOSEȘTE COACH-UL',
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  widget.store.goal,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 7,
-                                  runSpacing: 7,
-                                  children: [
-                                    _DetailPill(
-                                      icon: Icons.bolt_rounded,
-                                      text: profile.experience,
-                                    ),
-                                    _DetailPill(
-                                      icon: Icons.calendar_today_outlined,
-                                      text:
-                                          '${profile.sessionsPerWeek} zile / săpt.',
-                                    ),
-                                    _DetailPill(
-                                      icon: Icons.timer_outlined,
-                                      text: '${profile.sessionMinutes} min',
-                                    ),
-                                    _DetailPill(
-                                      icon: Icons.check_circle_outline_rounded,
-                                      text:
-                                          '${widget.store.history.where((s) => s.finishedAt != null).length} antrenamente',
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  profile.equipment.isEmpty
-                                      ? 'Ce echipament ai? Adaugă-l pentru un plan mai potrivit.'
-                                      : 'Echipament: ${profile.equipment.join(', ')}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: PiColors.muted(context),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () => editTrainingProfile(
-                                    context,
-                                    widget.store,
-                                  ),
-                                  child: const Text('Ajustează profilul meu'),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          ...[
-                            'Fă-mi un plan de ${profile.sessionsPerWeek} zile, cu ședințe de ${profile.sessionMinutes} minute.',
-                            widget.store.history.isEmpty
-                                ? 'Cu ce greutăți și câte serii să încep?'
-                                : 'Analizează jurnalul meu și recomandă următorul pas.',
-                            'Cum adaptez antrenamentul la echipamentul meu?',
-                          ].map(
-                            (q) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: PiCard(
-                                onTap: () => send(q),
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        q,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    const Icon(
-                                      Icons.north_east_rounded,
-                                      size: 18,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (service.remoteConfigured &&
-                              !profile.coachConsent) ...[
-                            const SizedBox(height: 8),
-                            PiCard(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  const Text(
-                                    'Activează personalizarea AI online',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Dacă accepți, mesajele, profilul și un rezumat al jurnalului vor fi trimise serviciului AI când trimiți o întrebare. Până atunci primești sugestii locale.',
-                                  ),
-                                  const SizedBox(height: 12),
-                                  OutlinedButton(
-                                    onPressed: () async {
-                                      try {
-                                        await widget.store.updateUserProfile(
-                                          profile.copyWith(coachConsent: true),
-                                        );
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          toast(context, _readableError(e));
-                                        }
-                                      }
-                                    },
-                                    child: const Text(
-                                      'Permit personalizarea online',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          if (service.remoteConfigured &&
-                              FirebaseGateway.instance.currentUser == null)
-                            TextButton(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      AuthScreen(store: widget.store),
-                                ),
-                              ),
-                              child: const Text(
-                                'Conectează-te pentru Pi Coach online',
-                              ),
-                            ),
-                          const SizedBox(height: 14),
-                          Text(
-                            online
-                                ? 'AI poate greși. Verifică recomandările și adaptează-le cu un antrenor; pentru durere sau afecțiuni, cere sfatul unui specialist.'
-                                : 'Sugestiile locale folosesc reguli și datele profilului; nu sunt răspunsuri ale unui model AI online. Mesajele nu sunt trimise pe server. Pentru durere sau afecțiuni, consultă un specialist.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: PiColors.muted(context),
-                            ),
-                          ),
-                        ],
-                        ...messages.map(
-                          (m) => Align(
-                            alignment: m.user
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 650),
-                              margin: EdgeInsets.only(
-                                bottom: 16,
-                                left: m.user ? 26 : 0,
-                                right: m.user ? 0 : 12,
-                              ),
-                              padding: const EdgeInsets.all(18),
-                              decoration: BoxDecoration(
-                                color: m.user
-                                    ? PiColors.lime
-                                    : PiColors.surface(
-                                        context,
-                                      ).withValues(alpha: .8),
-                                borderRadius: BorderRadius.circular(22),
-                                border: m.user
-                                    ? null
-                                    : Border.all(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: .07),
-                                      ),
-                              ),
-                              child: SelectableText(
-                                m.text,
-                                style: TextStyle(
-                                  height: 1.55,
-                                  color: m.user
-                                      ? const Color(0xFF172000)
-                                      : null,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (busy)
-                          const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text('Pi Coach pregătește răspunsul…'),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            key: const Key('coach-message'),
-                            controller: input,
-                            minLines: 1,
-                            maxLines: 4,
-                            maxLength: 3000,
-                            decoration: const InputDecoration(
-                              hintText: 'Întreabă-l pe Pi Coach…',
-                              counterText: '',
-                            ),
-                            onSubmitted: (_) => send(),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        IconButton.filled(
-                          onPressed: busy ? null : send,
-                          style: IconButton.styleFrom(
-                            backgroundColor: PiColors.lime,
-                            foregroundColor: const Color(0xFF172000),
-                            padding: const EdgeInsets.all(16),
-                          ),
-                          tooltip: 'Trimite',
-                          icon: const Icon(Icons.arrow_upward_rounded),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    },
   );
 }

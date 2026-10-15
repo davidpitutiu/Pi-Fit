@@ -242,7 +242,7 @@ void main() {
     );
     equipment.add('Cablu');
     days.add(6);
-    expect(value.equipment, ['Gantere']);
+    expect(value.equipment, ['Dumbbells']);
     expect(value.preferredDays, [2, 4]);
     expect(() => value.equipment.add('Aparat'), throwsUnsupportedError);
     expect(UserProfile.fromJson(value.toJson()).toJson(), value.toJson());
@@ -297,7 +297,7 @@ void main() {
       );
       expect(higherTarget.currentWeeks, 0);
       expect(higherTarget.bestWeeks, 0);
-      expect(partial.explanation, contains('Obiectivul actual'));
+      expect(partial.explanation, contains('Your current profile goal'));
     },
   );
 

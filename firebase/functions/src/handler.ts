@@ -1,9 +1,10 @@
 import type {Request} from "firebase-functions/v2/https";
 import type {Response} from "express";
 import {CoachInput, validateInput} from "./validation";
+import type {CoachOutput} from "./proposal";
+import {parseCoachOutput} from "./proposal";
 
-export const coachInstructions = `You are Pi, the fitness coach in Pi Fit. Reply in Romanian
-unless the user asks for another language. Help the user make a practical decision using
+export const coachInstructions = `You are Pi, the fitness coach in Pi Fit. Reply in English by default, including when the request is written in Romanian. Help the user make a practical decision using
 their stated goal, experience, available equipment, weekly frequency, session duration,
 preferred days, voluntary limitations and actual completed workout logs. Treat absent
 values as unknown. Never invent measurements, completed sessions, personal records,
@@ -28,7 +29,22 @@ treatment. Recommend stopping painful exercise and professional care when approp
 for chest pain, fainting or severe breathing difficulty recommend urgent medical help.
 Do not encourage dangerous weight cutting, starvation, steroid use or training through
 injury. For minors, avoid calorie-deficit or weight-cut prescriptions. State uncertainty.
-The profile and workout data are supplied by the user, not verified medical records.`;
+The profile and workout data are supplied by the user, not verified medical records.
+RPE is a subjective 1–10 effort rating reported for completed workout sets, not an
+exercise difficulty label. Never invent missing RPE or treat it as a medical test.
+Use activeSession or activeWorkout data for live advice without claiming to change a set.
+Prioritize currentExerciseId and the focused activeWorkout snapshot when supplied.
+Without per-set timestamps, list order does not establish the most recently edited set.
+Always return the requested structured JSON object. For general questions, pain,
+nutrition or absent context.planning, proposal must be null. Only an explicit request
+with valid context.planning may produce a program preview. Use only catalog IDs in
+planning.catalog. To modify a routine, use exactly planning.targetRoutineId and its
+provided expected revision; never modify built-in templates. Create new routines with
+null targetRoutineId and expectedRevision. Choose realistic sets/reps and zero load
+when a safe personal starting load cannot be established. Avoid duplicate exercises.
+Optional schedule details are a preview for one routine, never an executed calendar
+change. Explain that the user reviews and applies a proposal separately. Keep the
+summary under 1200 characters and each name under 80 characters.`;
 
 export interface CoachDependencies {
   allowedOrigins(): string;
@@ -36,7 +52,7 @@ export interface CoachDependencies {
   authenticate(token: string): Promise<{uid: string; anonymous: boolean}>;
   verifyAppCheck(token: string): Promise<void>;
   consumeLimit(uid: string): Promise<boolean>;
-  askProvider(input: CoachInput): Promise<string | null>;
+  askProvider(input: CoachInput): Promise<CoachOutput | string | null>;
   logFailure(): void;
 }
 
@@ -105,7 +121,13 @@ export function createCoachHandler(dependencies: CoachDependencies) {
         response.status(502).json({error: "Coach temporarily unavailable"});
         return;
       }
-      response.status(200).json({reply});
+      const output = typeof reply === "string" ? {reply} :
+        parseCoachOutput(JSON.stringify(reply), input);
+      if (!output) {
+        response.status(502).json({error: "Invalid coach proposal"});
+        return;
+      }
+      response.status(200).json(output);
     } catch {
       dependencies.logFailure();
       response.status(503).json({error: "Coach temporarily unavailable"});

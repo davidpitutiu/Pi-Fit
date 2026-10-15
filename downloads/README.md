@@ -1,35 +1,40 @@
-# Pi Fit — APK Android de test
+# Pi Fit — Android test builds
 
-- [Descarcă pentru Android ARM64 (majoritatea telefoanelor, 53,8 MB)](https://github.com/davidpitutiu/Pi-Fit/raw/refs/heads/main/downloads/Pi-Fit-Android-arm64.apk)
-- [Descarcă pentru Android ARMv7 (32 de biți, 51,5 MB)](https://github.com/davidpitutiu/Pi-Fit/raw/refs/heads/main/downloads/Pi-Fit-Android-armv7.apk)
+- [Download Android ARM64 (most phones, 25.4 MB)](https://github.com/davidpitutiu/Pi-Fit/raw/refs/heads/main/downloads/Pi-Fit-Android-arm64.apk)
+- [Download Android ARMv7 (32-bit phones, 23.5 MB)](https://github.com/davidpitutiu/Pi-Fit/raw/refs/heads/main/downloads/Pi-Fit-Android-armv7.apk)
 
-Versiune: **0.2.0**, identificator `com.pifit.app`, Android 8.0/API 26 sau mai nou.
-Builduri release optimizate, semnate cu aceeași cheie debug ca versiunea 0.1.0,
-destinate testării. Dimensiunea include aproximativ 28 MiB de fotografii offline.
+Version **0.3.0**, package `com.pifit.app`, Android 8.0/API 26 or newer.
+Release-mode test builds, signed with the same debug key as the earlier Pi Fit
+builds. They can update that installation and are not store-signed releases.
 
-Include 878 de exerciții, căutare și filtre în antrenament, statistici interactive
-pe 7/28/90 de zile, progres live și streak săptămânal. Health Connect citește
-activitatea după conectare explicită pe un dispozitiv compatibil; integrarea
-necesită verificare cu sursele și permisiunile telefonului.
+This version adds an English interface, original vector exercise art, per-set
+RPE effort ratings and live advice, shared rest/workout timers, notification
+shortcuts, coach proposals you can apply, height/weight history, and themed PDF
+exports for custom dates or all time. The 878-exercise catalog and workout filters
+remain available offline. Replacing bundled photos makes the download smaller.
 
-Configurațiile publice Firebase pentru `pi-fit-663f2` sunt incluse. Loginul
-email/parolă a fost verificat pe proiectul real. Backupul Firestore este încă
-refuzat de Firestore cu `PERMISSION_DENIED`, iar AI online necesită publicarea backendului și
-configurarea cheii pe server. Recomandările locale sunt disponibile între timp.
-Nu sunt incluse chei private sau credențiale de server.
+Health Connect requires a compatible Android device, source data and explicit
+permission. Notification delivery/actions still require physical-device testing.
+Apple Watch live sensor support is in the iOS/watchOS source and requires a
+separate signed iPhone/Watch build on macOS; it is not an Android APK feature.
 
-Verificarea integrității după descărcare, în folderul care conține APK-urile:
+Public Firebase client settings for `pi-fit-663f2` are included. Real email/password
+authentication was verified separately through Firebase REST. Firestore backup
+access is currently denied, and online AI still needs backend deployment and a
+server-side provider key. Personalized local guidance and program previews work
+without that deployment.
+
+Check downloaded files against [SHA256SUMS.txt](SHA256SUMS.txt):
 
 ```bash
 sha256sum -c SHA256SUMS.txt
 ```
 
-În Windows PowerShell:
+Windows PowerShell:
 
 ```powershell
 Get-FileHash .\Pi-Fit-Android-arm64.apk -Algorithm SHA256
 ```
 
-Compară rezultatul cu [SHA256SUMS.txt](SHA256SUMS.txt).
-Pentru reconstruire și limitările integrărilor, vezi [instrucțiunile proiectului](../README.md)
-și [validarea versiunii](../docs/validation.md).
+See the [project instructions](../README.md) and [validation report](../docs/validation.md)
+for build commands and the limits of cloud, Apple and device verification.

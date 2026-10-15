@@ -101,7 +101,7 @@ void main() {
 
         gateway.emit(_FakeUser('alice', 'Alice'));
         await tester.pump();
-        expect(find.text('Se deschide profilul tău…'), findsOneWidget);
+        expect(find.text('Opening your profile…'), findsOneWidget);
         expect(find.text('Private: Guest private journal'), findsNothing);
         expect(
           find.bySemanticsLabel('Private: Guest private journal'),
@@ -144,7 +144,7 @@ void main() {
       gateway.emit(_FakeUser('broken', 'Broken'));
       await tester.pumpAndSettle();
       expect(
-        find.textContaining('Profilul nu a putut fi deschis.'),
+        find.textContaining('Your profile could not be opened.'),
         findsOneWidget,
       );
       expect(find.text('Private: Guest private journal'), findsNothing);
@@ -156,13 +156,13 @@ void main() {
       expect(jsonEncode(store.exportData()), guestBefore);
       expect(store.preferences.getString('pifit.account.broken.v1'), corrupt);
 
-      await tester.tap(find.text('Revino la profilul local'));
+      await tester.tap(find.text('Return to guest profile'));
       await tester.pumpAndSettle();
       expect(gateway.signOutCalls, 1);
       expect(gateway.currentUser, isNull);
       expect(find.text('Private: Guest private journal'), findsOneWidget);
       expect(
-        find.textContaining('Profilul nu a putut fi deschis.'),
+        find.textContaining('Your profile could not be opened.'),
         findsNothing,
       );
       expect(jsonEncode(store.exportData()), guestBefore);
@@ -195,7 +195,7 @@ void main() {
       await tester.pump();
       expect(find.text('Private: Guest private journal'), findsNothing);
       expect(find.text('Private: Alice private journal'), findsNothing);
-      expect(find.text('Se deschide profilul tău…'), findsOneWidget);
+      expect(find.text('Opening your profile…'), findsOneWidget);
       bobHold.complete();
       await tester.pumpAndSettle();
       expect(store.accountId, 'bob');

@@ -14,10 +14,10 @@ class Exercise {
     this.secondaryImageAsset = '',
     this.imageUrl = '',
     this.secondaryImageUrl = '',
-    this.instructionLanguage = 'ro',
+    this.instructionLanguage = 'en',
     this.sourceId = '',
-    this.difficulty = 'Intermediar',
-    this.category = 'Forță',
+    this.difficulty = 'Intermediate',
+    this.category = 'Strength',
     this.movement = '',
     this.sourceName = '',
     this.aliases = const <String>[],
@@ -78,10 +78,10 @@ class Exercise {
     secondaryImageAsset: json['secondaryImageAsset'] as String? ?? '',
     imageUrl: json['imageUrl'] as String? ?? '',
     secondaryImageUrl: json['secondaryImageUrl'] as String? ?? '',
-    instructionLanguage: json['instructionLanguage'] as String? ?? 'ro',
+    instructionLanguage: json['instructionLanguage'] as String? ?? 'en',
     sourceId: json['sourceId'] as String? ?? '',
-    difficulty: json['difficulty'] as String? ?? 'Intermediar',
-    category: json['category'] as String? ?? 'Forță',
+    difficulty: json['difficulty'] as String? ?? 'Intermediate',
+    category: json['category'] as String? ?? 'Strength',
     movement: json['movement'] as String? ?? '',
     sourceName: json['sourceName'] as String? ?? '',
     aliases: List<String>.from(json['aliases'] as List? ?? const []),
@@ -185,37 +185,59 @@ class Routine {
         )
         .toList(),
     estimatedMinutes: (json['estimatedMinutes'] as num?)?.toInt() ?? 45,
-    category: json['category'] as String? ?? 'Personalizat',
+    category: json['category'] as String? ?? 'Custom',
   );
 }
 
 class WorkoutSet {
-  const WorkoutSet({this.reps = 10, this.weight = 0, this.completed = false});
+  const WorkoutSet({
+    this.reps = 10,
+    this.weight = 0,
+    this.completed = false,
+    this.rpe,
+  }) : assert(rpe == null || (rpe >= 1 && rpe <= 10));
 
   final int reps;
   final double weight;
   final bool completed;
 
+  /// User-reported effort, never inferred from load or used as health points.
+  final double? rpe;
+
   double get volume => completed ? reps * weight : 0;
 
-  WorkoutSet copyWith({int? reps, double? weight, bool? completed}) =>
-      WorkoutSet(
-        reps: reps ?? this.reps,
-        weight: weight ?? this.weight,
-        completed: completed ?? this.completed,
-      );
+  WorkoutSet copyWith({
+    int? reps,
+    double? weight,
+    bool? completed,
+    double? rpe,
+    bool clearRpe = false,
+  }) => WorkoutSet(
+    reps: reps ?? this.reps,
+    weight: weight ?? this.weight,
+    completed: completed ?? this.completed,
+    rpe: clearRpe ? null : rpe ?? this.rpe,
+  );
 
   Map<String, dynamic> toJson() => {
     'reps': reps,
     'weight': weight,
     'completed': completed,
+    if (rpe != null) 'rpe': rpe,
   };
 
-  factory WorkoutSet.fromJson(Map<String, dynamic> json) => WorkoutSet(
-    reps: (json['reps'] as num?)?.toInt() ?? 0,
-    weight: (json['weight'] as num?)?.toDouble() ?? 0,
-    completed: json['completed'] as bool? ?? false,
-  );
+  factory WorkoutSet.fromJson(Map<String, dynamic> json) {
+    final rpe = json['rpe'];
+    if (rpe != null && (rpe is! num || !rpe.isFinite || rpe < 1 || rpe > 10)) {
+      throw const FormatException('Effort must be a number from 1 to 10.');
+    }
+    return WorkoutSet(
+      reps: (json['reps'] as num?)?.toInt() ?? 0,
+      weight: (json['weight'] as num?)?.toDouble() ?? 0,
+      completed: json['completed'] as bool? ?? false,
+      rpe: (rpe as num?)?.toDouble(),
+    );
+  }
 }
 
 class WorkoutExercise {

@@ -5,19 +5,44 @@ class UserProfile {
     this.age,
     this.heightCm,
     this.weightKg,
-    this.experience = 'Începător',
+    String experience = 'Beginner',
     this.sessionsPerWeek = 3,
     this.sessionMinutes = 60,
     List<String> equipment = const [],
     this.limitations = '',
     List<int> preferredDays = const [1, 3, 5],
     this.coachConsent = false,
-  }) : equipment = List.unmodifiable(equipment),
+  }) : experience = normalizeExperience(experience),
+       equipment = List.unmodifiable(equipment.map(normalizeEquipment)),
        preferredDays = List.unmodifiable(preferredDays) {
     _validate();
   }
 
-  static const experiences = ['Începător', 'Intermediar', 'Avansat'];
+  static const experiences = ['Beginner', 'Intermediate', 'Advanced'];
+  static String normalizeExperience(String value) =>
+      const {
+        'Începător': 'Beginner',
+        'Intermediar': 'Intermediate',
+        'Avansat': 'Advanced',
+      }[value] ??
+      value;
+  static String normalizeEquipment(String value) =>
+      const {
+        'Sală completă': 'Full gym',
+        'Gantere': 'Dumbbells',
+        'Bară': 'Barbell',
+        'Aparat': 'Machines',
+        'Aparate': 'Machines',
+        'Cablu': 'Cable',
+        'Greutatea corpului': 'Bodyweight',
+        'Bandă elastică': 'Resistance bands',
+        'Benzi elastice': 'Resistance bands',
+        'Bară EZ': 'EZ bar',
+        'Bancă': 'Bench',
+        'Paralele': 'Dip bars',
+        'Bară de tracțiuni': 'Pull-up bar',
+      }[value] ??
+      value;
   final int? age;
   final double? heightCm;
   final double? weightKg;
@@ -49,7 +74,7 @@ class UserProfile {
         preferredDays.any((day) => day < 1 || day > 7) ||
         preferredDays.toSet().length != preferredDays.length) {
       throw ArgumentError(
-        'Profilul conține valori nevalide. Verifică intervalele indicate.',
+        'The training profile contains invalid values. Check the indicated ranges.',
       );
     }
   }
@@ -105,7 +130,7 @@ class UserProfile {
         if (value is! num ||
             !value.isFinite ||
             value != value.roundToDouble()) {
-          throw const FormatException('Număr întreg invalid.');
+          throw const FormatException('Invalid integer.');
         }
         return value.toInt();
       }
@@ -114,20 +139,20 @@ class UserProfile {
         final value = json[key];
         if (value == null) return null;
         if (value is! num || !value.isFinite) {
-          throw const FormatException('Măsurătoare invalidă.');
+          throw const FormatException('Invalid measurement.');
         }
         return value.toDouble();
       }
 
       final rawDays = json['preferredDays'] as List?;
       if (rawDays != null && rawDays.any((value) => value is! int)) {
-        throw const FormatException('Zile preferate nevalide.');
+        throw const FormatException('Invalid preferred days.');
       }
       return UserProfile(
         age: integer('age'),
         heightCm: decimal('heightCm'),
         weightKg: decimal('weightKg'),
-        experience: json['experience'] as String? ?? 'Începător',
+        experience: json['experience'] as String? ?? 'Beginner',
         sessionsPerWeek: integer('sessionsPerWeek') ?? 3,
         sessionMinutes: integer('sessionMinutes') ?? 60,
         equipment: List<String>.from(json['equipment'] as List? ?? const []),
@@ -140,7 +165,7 @@ class UserProfile {
     } on FormatException {
       rethrow;
     } catch (_) {
-      throw const FormatException('Profil de antrenament invalid.');
+      throw const FormatException('Invalid training profile.');
     }
   }
 }

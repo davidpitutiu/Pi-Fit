@@ -7,6 +7,7 @@ import {defineBoolean, defineSecret, defineString} from "firebase-functions/para
 import {onRequest} from "firebase-functions/v2/https";
 import {coachInstructions, createCoachHandler, providerConversation} from "./handler";
 import {checkLimit, extractReply} from "./validation";
+import {coachOutputSchema, parseCoachOutput} from "./proposal";
 
 initializeApp();
 const openAiKey = defineSecret("OPENAI_API_KEY");
@@ -53,8 +54,9 @@ export const coach = onRequest({
       body: JSON.stringify({
         model: model.value(),
         store: false,
-        max_output_tokens: 1800,
-        instructions: coachInstructions,
+        max_output_tokens: 4096,
+        text: {format: {type: "json_schema", name: "pi_fit_coach_reply", strict: true, schema: coachOutputSchema}},
+        instructions: `${coachInstructions}\nCurrent UTC date: ${new Date().toISOString().slice(0, 10)}`,
         input: providerConversation(input),
       }),
       signal: AbortSignal.timeout(35_000),
@@ -63,7 +65,7 @@ export const coach = onRequest({
       logger.warn("AI provider request failed", {status: upstream.status});
       return null;
     }
-    return extractReply(await upstream.json());
+    return parseCoachOutput(extractReply(await upstream.json()), input);
   },
   logFailure: () => {
     // Neither credentials nor profile/workout messages are logged.

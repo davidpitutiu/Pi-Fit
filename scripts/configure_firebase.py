@@ -105,7 +105,7 @@ def generate_dart(platforms):
         '  static FirebaseOptions get currentPlatform {',
         '    final options = forPlatform(defaultTargetPlatform, isWeb: kIsWeb);',
         '    if (options == null) {',
-        "      throw UnsupportedError('Firebase este disponibil pe Android, iOS și Web.');",
+        "      throw UnsupportedError('Firebase is available on Android, iOS and Web.');",
         '    }', '    return options;', '  }', '',
         '  static FirebaseOptions? forPlatform(TargetPlatform platform, {bool isWeb = false}) {',
         '    if (isWeb) return web;',

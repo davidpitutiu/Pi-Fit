@@ -10,8 +10,11 @@ import 'ui/training_screens.dart';
 import 'ui/planning_screens.dart';
 import 'ui/account_coach.dart';
 import 'ui/auth_scope_gate.dart';
+import 'ui/workout_notification_coordinator.dart';
+import 'ui/live_heart_rate_card.dart';
 
 final _navigationKey = GlobalKey<NavigatorState>();
+final _workoutRoutes = _WorkoutRoutes();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,13 +25,13 @@ Future<void> main() async {
     await FirebaseGateway.instance.initialize();
   } catch (_) {
     startupWarning =
-        'Firebase nu a putut fi inițializat. Modul local este disponibil.';
+        'Firebase could not connect. Your local workouts are available.';
   }
   try {
     await NotificationService.instance.initialize();
   } catch (_) {
     startupWarning =
-        'Notificările nu sunt disponibile. Calendarul poate fi folosit în continuare.';
+        'Notifications are unavailable. You can still use the calendar.';
   }
   runApp(PiFitApp(store: store, startupWarning: startupWarning));
 }
@@ -43,20 +46,53 @@ class PiFitApp extends StatelessWidget {
     builder: (context, _) => MaterialApp(
       title: 'Pi Fit',
       navigatorKey: _navigationKey,
+      navigatorObservers: [_workoutRoutes],
       debugShowCheckedModeBanner: false,
       theme: piTheme(Brightness.light),
       darkTheme: piTheme(Brightness.dark),
       themeMode: store.themeMode,
+      routes: {'/workout': (_) => ActiveWorkoutScreen(store: store)},
       builder: (context, child) => GlassBackground(
-        child: AuthScopeGate(
+        child: WorkoutNotificationCoordinator(
           store: store,
-          navigatorKey: _navigationKey,
-          child: child ?? const SizedBox.shrink(),
+          onOpenWorkout: () {
+            if (store.activeSession != null && !_workoutRoutes.workoutOpen) {
+              _navigationKey.currentState?.pushNamed('/workout');
+            }
+          },
+          child: PiWatchScope(
+            store: store,
+            child: AuthScopeGate(
+              store: store,
+              navigatorKey: _navigationKey,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         ),
       ),
       home: PiShell(store: store, startupWarning: startupWarning),
     ),
   );
+}
+
+class _WorkoutRoutes extends NavigatorObserver {
+  final _routes = <Route<dynamic>>{};
+  bool get workoutOpen =>
+      _routes.any((route) => route.settings.name == '/workout');
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _routes.add(route);
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _routes.remove(route);
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _routes.remove(route);
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _routes.remove(oldRoute);
+    if (newRoute != null) _routes.add(newRoute);
+  }
 }
 
 class PiShell extends StatefulWidget {
@@ -102,11 +138,11 @@ class _PiShellState extends State<PiShell> {
             child: Row(
               children: List.generate(5, (i) {
                 const labels = [
-                  'Acasă',
-                  'Exerciții',
-                  'Progres',
+                  'Home',
+                  'Exercises',
+                  'Progress',
                   'Calendar',
-                  'Profil',
+                  'Profile',
                 ];
                 const icons = [
                   Icons.home_outlined,

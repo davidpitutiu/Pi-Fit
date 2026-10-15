@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:health/health.dart';
 
-/// Health data stays in this screen's memory. It is never written to AppStore,
-/// Firebase, the AI payload, or the training score.
+/// Raw health data stays in screen memory. Body measurements can be imported
+/// separately by explicit user action; pulse/energy/workouts never enter AppStore.
 enum HealthProvider { appleHealth, healthConnect, unsupported }
 
 enum HealthAvailability { available, installRequired, unavailable, unsupported }
@@ -105,6 +105,50 @@ class HealthWorkoutRecord {
   Duration get duration => end.difference(start);
 }
 
+enum HealthBodyKind { weight, height }
+
+class HealthBodyRecord {
+  const HealthBodyRecord({
+    required this.id,
+    required this.kind,
+    required this.value,
+    required this.measuredAt,
+    required this.sourceName,
+    required this.sourceId,
+  });
+  final String id;
+  final HealthBodyKind kind;
+
+  /// Kilograms for weight, centimetres for height.
+  final double value;
+  final DateTime measuredAt;
+  final String sourceName;
+  final String sourceId;
+}
+
+class HealthHeartRateSample {
+  const HealthHeartRateSample({
+    required this.id,
+    required this.beatsPerMinute,
+    required this.measuredAt,
+    required this.sourceName,
+    required this.sourceId,
+    this.deviceModel,
+  });
+  final String id;
+  final double beatsPerMinute;
+  final DateTime measuredAt;
+  final String sourceName;
+  final String sourceId;
+  final String? deviceModel;
+}
+
+class HealthPulseRead {
+  const HealthPulseRead({required this.sample, required this.readAt});
+  final HealthHeartRateSample? sample;
+  final DateTime readAt;
+}
+
 class HealthSnapshot {
   const HealthSnapshot({
     required this.days,
@@ -113,6 +157,9 @@ class HealthSnapshot {
     required this.updatedAt,
     required this.iosReadAccessUndisclosed,
     required this.warnings,
+    this.bodyRecords = const [],
+    this.latestHeartRate,
+    this.bodyLookbackDays = 30,
   });
   final List<HealthDaySummary> days;
   final List<HealthEnergySample> energySamples;
@@ -120,6 +167,9 @@ class HealthSnapshot {
   final DateTime updatedAt;
   final bool iosReadAccessUndisclosed;
   final List<String> warnings;
+  final List<HealthBodyRecord> bodyRecords;
+  final HealthHeartRateSample? latestHeartRate;
+  final int bodyLookbackDays;
 
   List<String> get energySources {
     final counts = <String, int>{};
@@ -188,6 +238,9 @@ class HealthService {
     HealthDataType.STEPS,
     HealthDataType.ACTIVE_ENERGY_BURNED,
     HealthDataType.WORKOUT,
+    HealthDataType.HEART_RATE,
+    HealthDataType.HEIGHT,
+    HealthDataType.WEIGHT,
   ];
   static HealthProvider get currentProvider => kIsWeb
       ? HealthProvider.unsupported
@@ -199,7 +252,7 @@ class HealthService {
   String get providerName => switch (provider) {
     HealthProvider.appleHealth => 'Apple Health',
     HealthProvider.healthConnect => 'Health Connect',
-    HealthProvider.unsupported => 'Sănătate',
+    HealthProvider.unsupported => 'Health',
   };
 
   /// Availability only: opening the screen never reads records or asks consent.
@@ -231,7 +284,7 @@ class HealthService {
     final availability = await inspect();
     if (availability != HealthAvailability.available) {
       throw const HealthReadException(
-        'Serviciul de sănătate nu este disponibil pe acest dispozitiv.',
+        'The health service is unavailable on this device.',
       );
     }
     if (provider == HealthProvider.healthConnect) {
@@ -244,7 +297,7 @@ class HealthService {
         existing == true || await _source.requestReadAccess(readTypes);
     if (provider == HealthProvider.appleHealth && !requested) {
       throw const HealthReadException(
-        'Cererea Apple Health nu s-a încheiat. Poți încerca din nou.',
+        'The Apple Health request did not complete. Please try again.',
       );
     }
     _sessionOpened = true;
@@ -260,7 +313,7 @@ class HealthService {
   Future<HealthSnapshot> refresh() async {
     if (!_sessionOpened) {
       throw const HealthReadException(
-        'Conectează serviciul înainte de citirea datelor.',
+        'Connect the health service before reading data.',
       );
     }
     final end = _now();
@@ -276,20 +329,20 @@ class HealthService {
     }
     if (allowed.isEmpty) {
       throw const HealthReadException(
-        'Nu ai acordat permisiuni de citire. Activează categoriile dorite în Health Connect și reconectează.',
+        'No read permissions were granted. Enable the categories you want in Health Connect and reconnect.',
       );
     }
     if (provider == HealthProvider.healthConnect &&
         !await _source.activityRecognition(request: false)) {
       allowed.remove(HealthDataType.STEPS);
       warnings.add(
-        'Accesul la activitate fizică nu este acordat; pașii nu au fost citiți.',
+        'Physical activity access was not granted, so steps were not read.',
       );
     }
     if (allowed.length < readTypes.length &&
         provider == HealthProvider.healthConnect) {
       warnings.add(
-        'Unele categorii nu au permisiune. Nu sunt afișate valori inventate pentru datele inaccesibile.',
+        'Some categories are not permitted. Unavailable values are left unknown.',
       );
     }
     final days = <HealthDaySummary>[];
@@ -301,8 +354,8 @@ class HealthService {
         try {
           steps = await _source.steps(date, next.isAfter(end) ? end : next);
         } catch (_) {
-          if (!warnings.contains('Pașii nu au putut fi citiți complet.')) {
-            warnings.add('Pașii nu au putut fi citiți complet.');
+          if (!warnings.contains('Steps could not be read completely.')) {
+            warnings.add('Steps could not be read completely.');
           }
         }
       }
@@ -315,14 +368,15 @@ class HealthService {
     }
     Future<List<HealthDataPoint>> read(
       HealthDataType type,
-      String label,
-    ) async {
+      String label, {
+      DateTime? from,
+    }) async {
       if (!allowed.contains(type)) return [];
       try {
-        return await _source.read(type, start, end);
+        return await _source.read(type, from ?? start, end);
       } catch (_) {
         warnings.add(
-          '$label nu au putut fi citite. Verifică permisiunile și încearcă din nou.',
+          '$label could not be read. Check permissions and try again.',
         );
         return [];
       }
@@ -330,9 +384,25 @@ class HealthService {
 
     final energyPoints = await read(
       HealthDataType.ACTIVE_ENERGY_BURNED,
-      'Înregistrările de energie',
+      'Active-energy records',
     );
-    final workoutPoints = await read(HealthDataType.WORKOUT, 'Antrenamentele');
+    final workoutPoints = await read(HealthDataType.WORKOUT, 'Workouts');
+    final pulsePoints = await read(
+      HealthDataType.HEART_RATE,
+      'Heart-rate measurements',
+    );
+    final bodyLookbackDays = provider == HealthProvider.appleHealth ? 365 : 30;
+    final bodyStart = end.subtract(Duration(days: bodyLookbackDays));
+    final weightPoints = await read(
+      HealthDataType.WEIGHT,
+      'Weight measurements',
+      from: bodyStart,
+    );
+    final heightPoints = await read(
+      HealthDataType.HEIGHT,
+      'Height measurements',
+      from: bodyStart,
+    );
     final seenEnergy = <String>{};
     final energy = <HealthEnergySample>[];
     for (final point in energyPoints) {
@@ -377,7 +447,7 @@ class HealthService {
       final value = point.value;
       final name = value is WorkoutHealthValue
           ? healthWorkoutName(value.workoutActivityType)
-          : 'Antrenament';
+          : 'Workout';
       workouts.add(
         HealthWorkoutRecord(
           id: key,
@@ -396,37 +466,180 @@ class HealthService {
       updatedAt: end,
       iosReadAccessUndisclosed: provider == HealthProvider.appleHealth,
       warnings: List.unmodifiable(warnings),
+      bodyRecords: List.unmodifiable(
+        _bodyRecords([...weightPoints, ...heightPoints], bodyStart, end),
+      ),
+      latestHeartRate: _latestHeartRate(pulsePoints, start, end),
+      bodyLookbackDays: bodyLookbackDays,
     );
+  }
+
+  /// Foreground polling only reads pulse incrementally; it does not refetch
+  /// seven days of activity or import any data into the user's profile.
+  Future<HealthPulseRead> refreshHeartRate({
+    HealthHeartRateSample? previous,
+  }) async {
+    if (!_sessionOpened) {
+      throw const HealthReadException(
+        'Connect the health service before reading heart rate.',
+      );
+    }
+    if (provider == HealthProvider.healthConnect &&
+        await _source.hasReadAccess([HealthDataType.HEART_RATE]) != true) {
+      throw const HealthReadException(
+        'Heart-rate access is not granted in Health Connect.',
+      );
+    }
+    final end = _now();
+    final weekStart = end.subtract(const Duration(days: 7));
+    final incremental = previous?.measuredAt.subtract(
+      const Duration(minutes: 2),
+    );
+    final start = incremental != null && incremental.isAfter(weekStart)
+        ? incremental
+        : end.subtract(const Duration(days: 1));
+    try {
+      final points = await _source.read(HealthDataType.HEART_RATE, start, end);
+      return HealthPulseRead(
+        sample: _latestHeartRate(points, start, end),
+        readAt: end,
+      );
+    } catch (_) {
+      throw const HealthReadException(
+        'Heart rate could not be checked. Review access and source synchronization.',
+      );
+    }
+  }
+
+  String _recordId(HealthDataPoint point) =>
+      'health:${provider.name}:${point.sourceId}:${point.uuid}';
+  String _sourceName(HealthDataPoint point) => point.sourceName.isNotEmpty
+      ? point.sourceName
+      : point.sourceId.isNotEmpty
+      ? point.sourceId
+      : providerName;
+  bool _validInstant(HealthDataPoint point, DateTime start, DateTime end) =>
+      !point.dateFrom.isBefore(start) &&
+      !point.dateFrom.isAfter(end) &&
+      !point.dateTo.isBefore(point.dateFrom) &&
+      !point.dateTo.isAfter(end);
+
+  List<HealthBodyRecord> _bodyRecords(
+    List<HealthDataPoint> points,
+    DateTime start,
+    DateTime end,
+  ) {
+    final result = <HealthBodyRecord>[];
+    final seen = <String>{};
+    for (final point in points) {
+      final raw = point.value;
+      if (raw is! NumericHealthValue ||
+          !raw.numericValue.isFinite ||
+          !_validInstant(point, start, end)) {
+        continue;
+      }
+      final number = raw.numericValue.toDouble();
+      final HealthBodyKind kind;
+      final double value;
+      if (point.type == HealthDataType.WEIGHT) {
+        kind = HealthBodyKind.weight;
+        value = switch (point.unit) {
+          HealthDataUnit.KILOGRAM => number,
+          HealthDataUnit.GRAM => number / 1000,
+          HealthDataUnit.POUND => number * 0.45359237,
+          _ => double.nan,
+        };
+        if (!value.isFinite || value < 25 || value > 350) continue;
+      } else if (point.type == HealthDataType.HEIGHT) {
+        kind = HealthBodyKind.height;
+        value = switch (point.unit) {
+          HealthDataUnit.METER => number * 100,
+          HealthDataUnit.CENTIMETER => number,
+          HealthDataUnit.INCH => number * 2.54,
+          HealthDataUnit.FOOT => number * 30.48,
+          _ => double.nan,
+        };
+        if (!value.isFinite || value < 100 || value > 250) continue;
+      } else {
+        continue;
+      }
+      final id = '${_recordId(point)}:${kind.name}';
+      if (!seen.add(id)) continue;
+      result.add(
+        HealthBodyRecord(
+          id: id,
+          kind: kind,
+          value: value,
+          measuredAt: point.dateFrom.toLocal(),
+          sourceName: _sourceName(point),
+          sourceId: point.sourceId,
+        ),
+      );
+    }
+    result.sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
+    return result;
+  }
+
+  HealthHeartRateSample? _latestHeartRate(
+    List<HealthDataPoint> points,
+    DateTime start,
+    DateTime end,
+  ) {
+    HealthHeartRateSample? latest;
+    for (final point in points) {
+      final raw = point.value;
+      if (point.type != HealthDataType.HEART_RATE ||
+          point.unit != HealthDataUnit.BEATS_PER_MINUTE ||
+          raw is! NumericHealthValue ||
+          !raw.numericValue.isFinite ||
+          raw.numericValue <= 0 ||
+          raw.numericValue > 350 ||
+          !_validInstant(point, start, end)) {
+        continue;
+      }
+      final measuredAt = point.dateTo.toLocal();
+      if (latest == null || measuredAt.isAfter(latest.measuredAt)) {
+        latest = HealthHeartRateSample(
+          id: _recordId(point),
+          beatsPerMinute: raw.numericValue.toDouble(),
+          measuredAt: measuredAt,
+          sourceName: _sourceName(point),
+          sourceId: point.sourceId,
+          deviceModel: point.deviceModel,
+        );
+      }
+    }
+    return latest;
   }
 }
 
 String healthWorkoutName(HealthWorkoutActivityType type) => switch (type) {
   HealthWorkoutActivityType.WALKING ||
-  HealthWorkoutActivityType.WALKING_TREADMILL => 'Mers',
+  HealthWorkoutActivityType.WALKING_TREADMILL => 'Walking',
   HealthWorkoutActivityType.RUNNING ||
-  HealthWorkoutActivityType.RUNNING_TREADMILL => 'Alergare',
+  HealthWorkoutActivityType.RUNNING_TREADMILL => 'Running',
   HealthWorkoutActivityType.BIKING ||
-  HealthWorkoutActivityType.BIKING_STATIONARY => 'Ciclism',
+  HealthWorkoutActivityType.BIKING_STATIONARY => 'Cycling',
   HealthWorkoutActivityType.STRENGTH_TRAINING ||
   HealthWorkoutActivityType.FUNCTIONAL_STRENGTH_TRAINING ||
   HealthWorkoutActivityType.TRADITIONAL_STRENGTH_TRAINING ||
-  HealthWorkoutActivityType.WEIGHTLIFTING => 'Antrenament de forță',
+  HealthWorkoutActivityType.WEIGHTLIFTING => 'Strength training',
   HealthWorkoutActivityType.HIGH_INTENSITY_INTERVAL_TRAINING =>
-    'Intervale de intensitate mare',
+    'High-intensity intervals',
   HealthWorkoutActivityType.ROWING ||
-  HealthWorkoutActivityType.ROWING_MACHINE => 'Vâslit',
+  HealthWorkoutActivityType.ROWING_MACHINE => 'Rowing',
   HealthWorkoutActivityType.SWIMMING ||
   HealthWorkoutActivityType.SWIMMING_POOL ||
-  HealthWorkoutActivityType.SWIMMING_OPEN_WATER => 'Înot',
+  HealthWorkoutActivityType.SWIMMING_OPEN_WATER => 'Swimming',
   HealthWorkoutActivityType.YOGA => 'Yoga',
   HealthWorkoutActivityType.PILATES => 'Pilates',
-  HealthWorkoutActivityType.HIKING => 'Drumeție',
-  HealthWorkoutActivityType.ELLIPTICAL => 'Eliptică',
+  HealthWorkoutActivityType.HIKING => 'Hiking',
+  HealthWorkoutActivityType.ELLIPTICAL => 'Elliptical',
   HealthWorkoutActivityType.STAIR_CLIMBING ||
   HealthWorkoutActivityType.STAIR_CLIMBING_MACHINE ||
-  HealthWorkoutActivityType.STAIRS => 'Urcări de trepte',
-  HealthWorkoutActivityType.CALISTHENICS => 'Calistenie',
-  HealthWorkoutActivityType.OTHER => 'Alt antrenament',
+  HealthWorkoutActivityType.STAIRS => 'Stair climbing',
+  HealthWorkoutActivityType.CALISTHENICS => 'Calisthenics',
+  HealthWorkoutActivityType.OTHER => 'Other workout',
   _ =>
     type.name
         .split('_')

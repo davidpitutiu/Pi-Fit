@@ -13,6 +13,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_platfor
 import 'package:pi_fit/state/app_store.dart';
 import 'package:pi_fit/domain/models.dart';
 import 'package:pi_fit/domain/user_profile.dart';
+import 'package:pi_fit/domain/coach_plan.dart';
 import 'package:pi_fit/services/notification_service.dart';
 
 void main() {
@@ -102,7 +103,7 @@ void main() {
   test(
     'malformed backup cannot partially change the current profile or workout',
     () async {
-      await store.updateProfile('Alex', 'Condiție fizică');
+      await store.updateProfile('Alex', 'General fitness');
       await store.startWorkout(store.routines.first);
       await store.updateSet(0, 0, reps: 8, weight: 32.5, completed: true);
       final before = store.exportData();
@@ -120,7 +121,7 @@ void main() {
   test(
     'successful restore retains a recovery copy of the previous data',
     () async {
-      await store.updateProfile('Profil local', 'Controlul greutății');
+      await store.updateProfile('Profil local', 'Weight management');
       await store.startWorkout(store.routines.first);
       final original = store.exportData();
       final backup = AppStore(
@@ -149,7 +150,7 @@ void main() {
       backup['name'] = '   ';
       backup['goal'] = 'Un obiectiv dintr-o versiune veche';
       await store.restoreBackup(backup);
-      expect(store.name, 'Atlet');
+      expect(store.name, 'Athlete');
       expect(store.goal, AppStore.profileGoals.first);
       await store.updateProfile('  Radu  ', '');
       expect(store.name, 'Radu');
@@ -177,7 +178,7 @@ void main() {
         ).toJson(),
       ];
       await store.restoreBackup(backup);
-      expect(store.exerciseById('removed-exercise').name, 'Exercițiu salvat');
+      expect(store.exerciseById('removed-exercise').name, 'Saved exercise');
       expect(
         store.history.single.exercises.single.exerciseId,
         'removed-exercise',
@@ -326,7 +327,7 @@ void main() {
       await store.updateUserProfile(
         profile,
         newName: '  David  ',
-        newGoal: 'Condiție fizică',
+        newGoal: 'General fitness',
       );
       final id = store.exercises.first.id;
       await store.setExerciseFavorite(id, true);
@@ -334,7 +335,7 @@ void main() {
       await reopened.load();
       expect(reopened.profile.toJson(), profile.toJson());
       expect(reopened.name, 'David');
-      expect(reopened.goal, 'Condiție fizică');
+      expect(reopened.goal, 'General fitness');
       expect(reopened.favoriteExerciseIds, {id});
       expect(
         () => reopened.favoriteExerciseIds.add('other'),
@@ -468,7 +469,7 @@ void main() {
       final guest = store.exportData();
       await store.switchAccount('account-a');
       expect(store.accountId, 'account-a');
-      expect(store.name, 'Atlet');
+      expect(store.name, 'Athlete');
       expect(store.activeSession, isNull);
       expect(store.profile.age, isNull);
       await store.updateUserProfile(UserProfile(age: 40), newName: 'Account A');
@@ -476,10 +477,10 @@ void main() {
       await store.startWorkout(store.routines.last);
       final accountA = store.exportData();
       await store.switchAccount('account-b');
-      expect(store.name, 'Atlet');
+      expect(store.name, 'Athlete');
       expect(store.favoriteExerciseIds, isEmpty);
       expect(store.activeSession, isNull);
-      await store.updateProfile('Account B', 'Condiție fizică');
+      await store.updateProfile('Account B', 'General fitness');
       await store.switchAccount('account-a');
       expect(store.exportData(), accountA);
       await store.switchAccount(null);
@@ -497,7 +498,7 @@ void main() {
       final second = store.switchAccount('account-b');
       await Future.wait([first, second]);
       expect(store.accountId, 'account-b');
-      await store.updateProfile('B saved', 'Condiție fizică');
+      await store.updateProfile('B saved', 'General fitness');
       final before = store.exportData();
       await store.switchAccount('account-b');
       expect(store.exportData(), before);
@@ -508,7 +509,7 @@ void main() {
     'corrupt target is preserved without replacing current account or blocking later switches',
     () async {
       final preferences = await SharedPreferences.getInstance();
-      await store.updateProfile('Guest preserved', 'Condiție fizică');
+      await store.updateProfile('Guest preserved', 'General fitness');
       final before = store.exportData();
       await preferences.setString('pifit.account.broken.v1', 'corrupt-target');
       await expectLater(store.switchAccount('broken'), throwsFormatException);
@@ -524,7 +525,7 @@ void main() {
       );
       await store.switchAccount('working');
       expect(store.accountId, 'working');
-      expect(store.name, 'Atlet');
+      expect(store.name, 'Athlete');
     },
   );
 
@@ -532,7 +533,7 @@ void main() {
     'failed target write rolls back cache and leaves current account intact',
     () async {
       final preferences = await SharedPreferences.getInstance();
-      await store.updateProfile('Guest preserved', 'Condiție fizică');
+      await store.updateProfile('Guest preserved', 'General fitness');
       final before = store.exportData();
       final originalPlatform = SharedPreferencesStorePlatform.instance;
       SharedPreferencesStorePlatform.instance = _FailingPreferences(
@@ -630,7 +631,7 @@ void main() {
       await store.updateUserProfile(
         UserProfile(age: 42, sessionsPerWeek: 4),
         newName: 'Account name',
-        newGoal: 'Condiție fizică',
+        newGoal: 'General fitness',
       );
       await store.startEmptyWorkout();
       final activeId = store.activeSession!.id;
@@ -640,7 +641,7 @@ void main() {
       expect(store.schedule.length, 1);
       expect(store.favoriteExerciseIds, {store.exercises.first.id});
       expect(store.name, 'Account name');
-      expect(store.goal, 'Condiție fizică');
+      expect(store.goal, 'General fitness');
       expect(store.profile.age, 42);
       expect(store.profile.sessionsPerWeek, 4);
       expect(store.activeSession!.id, activeId);
@@ -730,7 +731,7 @@ void main() {
     await changing;
     await rejected;
     expect(store.accountId, 'bob');
-    expect(store.name, 'Atlet');
+    expect(store.name, 'Athlete');
   });
 
   test(
@@ -753,7 +754,7 @@ void main() {
       await restoring;
       await switching;
       expect(store.accountId, 'bob');
-      expect(store.name, 'Atlet');
+      expect(store.name, 'Athlete');
       expect(
         jsonDecode(
           store.preferences.getString('pifit.account.alice.v1')!,
@@ -764,7 +765,7 @@ void main() {
         jsonDecode(
           store.preferences.getString('pifit.account.bob.v1')!,
         )['name'],
-        'Atlet',
+        'Athlete',
       );
     },
   );
@@ -854,6 +855,310 @@ void main() {
       expect(store.schedule, isEmpty);
     },
   );
+  test(
+    'manual profile changes append real measurements only when values change',
+    () async {
+      await store.updateUserProfile(
+        UserProfile(weightKg: 80, heightCm: 180),
+        newName: 'David',
+      );
+      expect(store.bodyMeasurements, hasLength(1));
+      expect(store.bodyMeasurements.first.weightKg, 80);
+      expect(store.bodyMeasurements.first.heightCm, 180);
+      await store.updateUserProfile(store.profile, newName: 'David renamed');
+      expect(store.bodyMeasurements, hasLength(1));
+      await store.updateUserProfile(store.profile.copyWith(heightCm: 182));
+      expect(store.bodyMeasurements, hasLength(2));
+      expect(store.bodyMeasurements.first.heightCm, 182);
+      expect(store.bodyMeasurements.first.weightKg, isNull);
+      await store.updateUserProfile(
+        store.profile.copyWith(clearWeightKg: true),
+      );
+      expect(store.bodyMeasurements, hasLength(2));
+      expect(store.profile.weightKg, isNull);
+      final reopened = AppStore(store.preferences);
+      await reopened.load();
+      expect(
+        reopened.bodyMeasurements.map((item) => item.toJson()),
+        store.bodyMeasurements.map((item) => item.toJson()),
+      );
+      expect(() => store.bodyMeasurements.clear(), throwsUnsupportedError);
+    },
+  );
+
+  test(
+    'backdated Health imports keep newer profile values and deduplicate source records',
+    () async {
+      final now = DateTime.now();
+      await store.recordBodyMeasurement(
+        weightKg: 82,
+        measuredAt: now.subtract(const Duration(days: 10)),
+        source: 'health',
+        sourceRecordId: 'health/weight/1',
+        sourceName: 'Health Connect',
+      );
+      expect(store.profile.weightKg, 82);
+      await store.recordBodyMeasurement(
+        weightKg: 80,
+        measuredAt: now.subtract(const Duration(days: 1)),
+      );
+      await store.recordBodyMeasurement(
+        weightKg: 90,
+        heightCm: 179,
+        measuredAt: now.subtract(const Duration(days: 20)),
+        source: 'health',
+        sourceRecordId: 'health/older/2',
+        sourceName: 'Health Connect',
+      );
+      expect(store.profile.weightKg, 80);
+      expect(store.profile.heightCm, 179);
+      expect(store.bodyMeasurements, hasLength(3));
+      expect(store.bodyMeasurements.first.weightKg, 80);
+      final before = store.exportData();
+      await store.recordBodyMeasurement(
+        weightKg: 90,
+        heightCm: 179,
+        measuredAt: now.subtract(const Duration(days: 20)),
+        source: 'health',
+        sourceRecordId: 'health/older/2',
+        sourceName: 'Health Connect',
+      );
+      expect(store.exportData(), before);
+      expect(store.bodyMeasurements.last.sourceName, 'Health Connect');
+    },
+  );
+
+  test(
+    'measurement validation and malformed imports never partially replace data',
+    () async {
+      await store.recordBodyMeasurement(weightKg: 80);
+      final before = store.exportData();
+      await expectLater(
+        store.recordBodyMeasurement(weightKg: double.nan),
+        throwsArgumentError,
+      );
+      await expectLater(
+        store.recordBodyMeasurement(heightCm: 99),
+        throwsArgumentError,
+      );
+      await expectLater(store.recordBodyMeasurement(), throwsArgumentError);
+      await expectLater(
+        store.recordBodyMeasurement(
+          weightKg: 80,
+          measuredAt: DateTime.now().add(const Duration(days: 1)),
+        ),
+        throwsArgumentError,
+      );
+      final invalid = {
+        ...before,
+        'bodyMeasurements': [
+          {...store.bodyMeasurements.single.toJson(), 'weightKg': -20},
+        ],
+      };
+      await expectLater(store.restoreBackup(invalid), throwsFormatException);
+      final duplicate = {
+        ...before,
+        'bodyMeasurements': [
+          store.bodyMeasurements.single.toJson(),
+          store.bodyMeasurements.single.toJson(),
+        ],
+      };
+      await expectLater(store.restoreBackup(duplicate), throwsFormatException);
+      expect(store.exportData(), before);
+    },
+  );
+
+  test(
+    'measurements isolate accounts and guest import preserves the current profile',
+    () async {
+      await store.recordBodyMeasurement(weightKg: 80, heightCm: 180);
+      final guestRaw = store.preferences.getString('pifit.local.v1');
+      await store.switchAccount('alice');
+      expect(store.bodyMeasurements, isEmpty);
+      await store.recordBodyMeasurement(weightKg: 90);
+      await store.importGuestJournal();
+      expect(store.bodyMeasurements, hasLength(2));
+      expect(store.profile.weightKg, 90);
+      expect(store.profile.heightCm, isNull);
+      await store.importGuestJournal();
+      expect(store.bodyMeasurements, hasLength(2));
+      expect(store.preferences.getString('pifit.local.v1'), guestRaw);
+      final alice = store.exportData();
+      await store.switchAccount('bob');
+      expect(store.bodyMeasurements, isEmpty);
+      expect(store.profile.weightKg, isNull);
+      await store.switchAccount('alice');
+      expect(store.exportData(), alice);
+      await store.switchAccount(null);
+      expect(store.bodyMeasurements, hasLength(1));
+      expect(store.profile.weightKg, 80);
+    },
+  );
+
+  test(
+    'v1 backups keep optional body history empty and migrate legacy English preferences',
+    () async {
+      final legacy = store.exportData()
+        ..remove('bodyMeasurements')
+        ..remove('appliedCoachProposalIds');
+      legacy['name'] = 'Atlet';
+      legacy['goal'] = 'Condiție fizică';
+      legacy['profile'] = {
+        ...store.profile.toJson(),
+        'experience': 'Intermediar',
+        'equipment': ['Gantere', 'Cablu'],
+        'weightKg': 82,
+      };
+      await store.restoreBackup(legacy);
+      expect(store.name, 'Athlete');
+      expect(store.goal, 'General fitness');
+      expect(store.profile.experience, 'Intermediate');
+      expect(store.profile.equipment, ['Dumbbells', 'Cable']);
+      expect(store.profile.weightKg, 82);
+      expect(store.bodyMeasurements, isEmpty);
+    },
+  );
+
+  test(
+    'reported effort persists by account and active coach context uses the last sets',
+    () async {
+      await store.switchAccount('alice');
+      await store.startWorkout(store.routines.first);
+      await store.updateSet(
+        0,
+        0,
+        reps: 8,
+        weight: 50,
+        completed: true,
+        rpe: 8.5,
+      );
+      final volume = store.activeSession!.volume;
+      final reopened = AppStore(store.preferences);
+      await reopened.switchAccount('alice');
+      expect(reopened.activeSession!.exercises.first.sets.first.rpe, 8.5);
+      for (final invalid in [double.nan, 0.0, 10.1]) {
+        await expectLater(
+          store.updateSet(0, 0, rpe: invalid),
+          throwsArgumentError,
+        );
+      }
+      await store.updateSet(0, 0, clearRpe: true);
+      expect(store.activeSession!.exercises.first.sets.first.rpe, isNull);
+      expect(store.activeSession!.volume, volume);
+      for (var index = 0; index < 5; index++) {
+        await store.addSet(0);
+      }
+      final last = store.activeSession!.exercises.first.sets.length - 1;
+      await store.updateSet(
+        0,
+        last,
+        reps: 8,
+        weight: 50,
+        completed: true,
+        rpe: 9,
+      );
+      final context = jsonDecode(store.localCoachContext) as Map;
+      final exercise =
+          (((context['activeSession'] as Map)['exercises'] as List).first
+              as Map);
+      expect(((exercise['sets'] as List).last as Map)['rpe'], 9);
+      await store.addSet(0);
+      expect(store.activeSession!.exercises.first.sets.last.rpe, isNull);
+      await store.switchAccount('bob');
+      expect(store.activeSession, isNull);
+      await store.switchAccount('alice');
+      expect(store.activeSession!.exercises.first.sets[last].rpe, 9);
+    },
+  );
+
+  test('malformed effort in backup preserves current session', () async {
+    await store.startWorkout(store.routines.first);
+    await store.updateSet(0, 0, rpe: 7);
+    final before = store.exportData();
+    final invalid = jsonDecode(jsonEncode(before)) as Map<String, dynamic>;
+    ((((invalid['active'] as Map)['exercises'] as List).first as Map)['sets']
+                as List)
+            .first['rpe'] =
+        11;
+    await expectLater(store.restoreBackup(invalid), throwsFormatException);
+    expect(store.exportData(), before);
+  });
+
+  test(
+    'coach plan applies routines and bulk calendar atomically and only once',
+    () async {
+      await store.switchAccount('alice');
+      final proposal = _coachProposal(store, withSchedule: true);
+      await store.applyCoachProposal(proposal);
+      expect(store.customRoutines, hasLength(1));
+      expect(store.schedule, hasLength(6));
+      expect(
+        store.schedule.every(
+          (item) => item.routineId == store.customRoutines.single.id,
+        ),
+        isTrue,
+      );
+      expect(store.appliedCoachProposalIds, {proposal.id});
+      final applied = store.exportData();
+      await store.applyCoachProposal(proposal);
+      expect(store.exportData(), applied);
+      final reopened = AppStore(store.preferences);
+      await reopened.switchAccount('alice');
+      expect(reopened.exportData(), applied);
+      await reopened.applyCoachProposal(proposal);
+      expect(reopened.exportData(), applied);
+    },
+  );
+
+  test(
+    'coach proposals refuse stale preferences, changed routines and different accounts',
+    () async {
+      await store.switchAccount('alice');
+      final proposal = _coachProposal(store);
+      await store.updateUserProfile(store.profile.copyWith(sessionsPerWeek: 4));
+      final before = store.exportData();
+      await expectLater(store.applyCoachProposal(proposal), throwsStateError);
+      expect(store.exportData(), before);
+      final valid = _coachProposal(store);
+      await store.switchAccount('bob');
+      final bobBefore = store.exportData();
+      await expectLater(store.applyCoachProposal(valid), throwsStateError);
+      expect(store.exportData(), bobBefore);
+    },
+  );
+
+  test(
+    'coach routine edits preserve IDs and active workouts; failed writes roll back entire proposal',
+    () async {
+      final existing = Routine(
+        id: 'custom-edit',
+        name: 'Original',
+        subtitle: '',
+        exercises: [RoutineExercise(exerciseId: store.exercises.first.id)],
+        estimatedMinutes: 45,
+        category: 'Custom',
+      );
+      await store.saveRoutine(existing);
+      await store.startWorkout(existing);
+      final activeBefore = store.activeSession!.toJson();
+      final editing = _coachProposal(store, target: existing);
+      await store.applyCoachProposal(editing);
+      expect(store.customRoutines.single.id, existing.id);
+      expect(store.customRoutines.single.name, 'Coach routine');
+      expect(store.activeSession!.toJson(), activeBefore);
+      final proposal = _coachProposal(store, withSchedule: true);
+      final before = store.exportData();
+      final originalPlatform = SharedPreferencesStorePlatform.instance;
+      SharedPreferencesStorePlatform.instance = _FailingPreferences(
+        'pifit.local.v1',
+      );
+      addTearDown(
+        () => SharedPreferencesStorePlatform.instance = originalPlatform,
+      );
+      await expectLater(store.applyCoachProposal(proposal), throwsStateError);
+      expect(store.exportData(), before);
+    },
+  );
 }
 
 class _FailingPreferences extends InMemorySharedPreferencesStore {
@@ -879,4 +1184,46 @@ class _DelayedPreferences extends InMemorySharedPreferencesStore {
     }
     return super.setValue(valueType, key, value);
   }
+}
+
+CoachProposal _coachProposal(
+  AppStore store, {
+  Routine? target,
+  bool withSchedule = false,
+}) {
+  final draft = CoachRoutineDraft(
+    targetRoutineId: target?.id,
+    expectedRevision: target == null ? null : coachRoutineRevision(target),
+    name: 'Coach routine',
+    subtitle: 'Reviewed plan',
+    estimatedMinutes: 45,
+    exercises: [
+      RoutineExercise(exerciseId: store.exercises.first.id, sets: 3, reps: 8),
+    ],
+  );
+  return CoachProposal.fromWireJson(
+    {
+      'schemaVersion': 1,
+      'title': 'Training plan',
+      'summary': 'A plan to preview before applying.',
+      'routines': [draft.toJson()],
+      'schedule': withSchedule
+          ? CoachScheduleDraft(
+              routineIndex: 0,
+              weeks: 2,
+              weekdays: [1, 3, 5],
+              startDate: DateTime.now().add(const Duration(days: 7)),
+            ).toJson()
+          : null,
+    },
+    accountId: store.accountId,
+    baseRevision: coachPlanningRevision(
+      profile: store.profile,
+      goal: store.goal,
+      routines: store.customRoutines,
+    ),
+    source: CoachProposalSource.local,
+    catalog: store.exercises,
+    customRoutines: store.customRoutines,
+  );
 }

@@ -8,9 +8,7 @@ class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     final options = forPlatform(defaultTargetPlatform, isWeb: kIsWeb);
     if (options == null) {
-      throw UnsupportedError(
-        'Firebase este disponibil pe Android, iOS și Web.',
-      );
+      throw UnsupportedError('Firebase is available on Android, iOS and Web.');
     }
     return options;
   }

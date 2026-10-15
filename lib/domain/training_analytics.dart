@@ -83,10 +83,10 @@ class TrainingStreak {
   final int targetDaysPerWeek;
   final DateTime currentWeekStart;
   String get explanation =>
-      'O săptămână contează când ai cel puțin $targetDaysPerWeek zile distincte '
-      'cu antrenamente finalizate, de luni până duminică. Săptămâna curentă '
-      'încă în desfășurare nu întrerupe seria precedentă. Obiectivul actual '
-      'din profil este aplicat întregului istoric; schimbarea lui recalculează seria.';
+      'A week counts when you log at least $targetDaysPerWeek distinct training days '
+      'with completed workouts, Monday to Sunday. The current unfinished week '
+      'does not break the previous streak. Your current profile goal '
+      'is applied to all history; changing it recalculates the streak.';
 }
 
 class DailyTrainingActivity {
@@ -136,9 +136,9 @@ class TrainingSeries {
     points.where((point) => point.activeDays > 0).map((point) => point.date),
   );
   String get explanation =>
-      'Ultimele $days zile calendaristice, inclusiv azi. '
-      'Numai sesiuni finalizate până acum și seturi bifate valide. Zilele fără '
-      'date au valoarea zero; durata este timpul înregistrat, inclusiv pauzele.';
+      'The last $days calendar days, including today. '
+      'Only sessions completed by now with valid checked sets. Days without '
+      'data have value zero; duration is logged time, including rests.';
 }
 
 class ExerciseProgressPoint {
@@ -203,19 +203,19 @@ class TrainingAnalytics {
   final TrainingStreak streak;
   int get currentStreakWeeks => streak.currentWeeks;
   int get bestStreakWeeks => streak.bestWeeks;
-  String get scoreLabel => 'Scor de consecvență';
+  String get scoreLabel => 'Consistency score';
   String get scoreExplanation =>
-      'Măsoară respectarea obiectivului de zile de antrenament, nu sănătatea, '
-      'nivelul fizic sau calitatea tehnicii. Obiectivul este configurabil în profil.';
+      'Measures adherence to your training-day goal, not health, '
+      'fitness or technique. You can set your goal in your profile.';
   String get volumeExplanation =>
-      'Volum extern = kg × repetări pentru seturile bifate de forță. '
-      'Nu include greutatea corpului, cardio sau mobilitatea; aparatele și '
-      'exercițiile diferite nu se compară direct.';
+      'External volume = kg × reps for checked strength sets. '
+      'Excludes bodyweight, cardio and mobility; different machines and '
+      'exercises cannot be compared directly.';
   String get recordsExplanation =>
-      'Recorduri din tot istoricul finalizat: cea mai mare estimare Epley '
-      '(kg × (1 + repetări / 30), numai 1–12 repetări). Estimarea 1RM nu '
-      'este o recomandare de greutate. Dacă lipsesc seturi eligibile, este '
-      'afișat cel mai greu set fără estimare.';
+      'All-time completed-workout records: highest Epley estimate '
+      '(kg × (1 + reps / 30), only 1–12 reps). Estimated 1RM is not '
+      'a recommended weight. When no eligible sets exist, '
+      'the heaviest set is shown without an estimate.';
 }
 
 /// Four consecutive seven-calendar-day blocks, including today, in the device's
@@ -278,7 +278,7 @@ TrainingAnalytics analyzeTraining({
   for (final session in recent) {
     for (final item in session.exercises) {
       final exercise = catalog[item.exerciseId];
-      final muscle = exercise?.muscle ?? 'Altele';
+      final muscle = exercise?.muscle ?? 'Other';
       for (final set in item.sets.where(_validSet)) {
         byMuscleSets[muscle] = (byMuscleSets[muscle] ?? 0) + 1;
         byMuscleVolume[muscle] =
@@ -342,24 +342,24 @@ TrainingAnalytics analyzeTraining({
     targetSessionsPerWeek: profile.sessionsPerWeek,
     components: List.unmodifiable([
       ScoreComponent(
-        label: 'Zile de antrenament',
+        label: 'Training days',
         value: activeDays,
         target: target,
         points: adherencePoints,
         maxPoints: 70,
         explanation:
-            '70 × min(zile active / $target, 1). Mai multe sesiuni în '
-            'aceeași zi contează o singură dată.',
+            '70 × min(active days / $target, 1). Multiple sessions on '
+            'the same day count once.',
       ),
       ScoreComponent(
-        label: 'Săptămâni consecvente',
+        label: 'Consistent weeks',
         value: consistentWeeks,
         target: 4,
         points: consistencyPoints,
         maxPoints: 30,
         explanation:
-            '30 × săptămâni cu cel puțin ${profile.sessionsPerWeek} '
-            'zile active / 4.',
+            '30 × weeks with at least ${profile.sessionsPerWeek} '
+            'active days / 4.',
       ),
     ]),
     weeks: List.unmodifiable(weeks),
@@ -369,14 +369,14 @@ TrainingAnalytics analyzeTraining({
     asOf: asOf,
     streak: _trainingStreak(completed, profile, asOf),
     formula:
-        'Scor = 70 × min(zile active / (4 × obiectiv săptămânal), 1) + '
-        '30 × săptămâni care ating obiectivul / 4.',
+        'Score = 70 × min(active days / (4 × weekly goal), 1) + '
+        '30 × weeks meeting the goal / 4.',
     windowExplanation:
-        'Ultimele 28 de zile calendaristice, inclusiv azi, '
-        'împărțite în 4 intervale consecutive de 7 zile. Sunt incluse doar '
-        'sesiuni finalizate până acum, cu cel puțin un set bifat valid. '
-        'Grupele musculare primesc seturi numai pentru mușchiul principal, '
-        'fără dublarea mușchilor secundari.',
+        'The last 28 calendar days, including today, '
+        'split into 4 consecutive 7-day intervals. Includes only '
+        'sessions completed by now with at least one valid checked set. '
+        'Sets are assigned to the primary muscle only, '
+        'without counting secondary muscles twice.',
   );
 }
 
@@ -423,7 +423,7 @@ TrainingSeries buildTrainingSeries({
     for (final session in sessions) {
       for (final item in session.exercises) {
         final exercise = catalog[item.exerciseId];
-        final muscle = exercise?.muscle ?? 'Altele';
+        final muscle = exercise?.muscle ?? 'Other';
         for (final set in item.sets.where(_validSet)) {
           muscleSets[muscle] = (muscleSets[muscle] ?? 0) + 1;
           muscleVolume[muscle] =
@@ -578,7 +578,7 @@ TrainingStreak _trainingStreak(
 
 void _validateSeriesDays(int days) {
   if (!const {7, 28, 90}.contains(days)) {
-    throw ArgumentError.value(days, 'days', 'Alege 7, 28 sau 90 de zile.');
+    throw ArgumentError.value(days, 'days', 'Choose 7, 28 or 90 days.');
   }
 }
 
@@ -599,6 +599,14 @@ List<WorkoutSession> _completedSessions(
       )
       .toList();
 }
+
+/// Canonical completed, usable, deduplicated sessions for counters and reports.
+List<WorkoutSession> completedTrainingSessions(
+  List<WorkoutSession> history, {
+  DateTime? now,
+}) => List.unmodifiable(
+  _completedSessions(history, (now ?? DateTime.now()).toLocal()),
+);
 
 /// Shared with live workout displays so totals and historical charts agree.
 bool isValidCompletedSet(WorkoutSet set) => _validSet(set);
@@ -629,16 +637,24 @@ bool _validSet(WorkoutSet set) =>
 
 bool _weightedExercise(Exercise? exercise) =>
     exercise != null &&
-    exercise.category == 'Forță' &&
+    const {'Forță', 'Strength'}.contains(exercise.category) &&
     const {
       'Bară',
+      'Barbell',
       'Gantere',
+      'Dumbbells',
       'Cablu',
+      'Cable',
       'Aparat',
+      'Machine',
+      'Machines',
       'Bară EZ',
+      'EZ bar',
       'Kettlebell',
       'Smith',
+      'Smith machine',
       'Disc',
+      'Weight plate',
     }.contains(exercise.equipment);
 
 int _sets(List<WorkoutSession> sessions) => sessions.fold(

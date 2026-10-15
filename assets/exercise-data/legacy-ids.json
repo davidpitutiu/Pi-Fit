@@ -1,0 +1,1082 @@
+[
+  {
+    "id": "bench_press",
+    "sourceId": "Barbell_Bench_Press_-_Medium_Grip",
+    "name": "Împins la bancă cu bara"
+  },
+  {
+    "id": "incline_dumbbell_press",
+    "sourceId": "Incline_Dumbbell_Press",
+    "name": "Împins înclinat cu gantere"
+  },
+  {
+    "id": "dumbbell_press",
+    "sourceId": "Dumbbell_Bench_Press",
+    "name": "Împins orizontal cu gantere"
+  },
+  {
+    "id": "chest_fly",
+    "sourceId": "Dumbbell_Flyes",
+    "name": "Fluturări cu gantere"
+  },
+  {
+    "id": "cable_fly",
+    "sourceId": "Cable_Crossover",
+    "name": "Fluturări la cabluri"
+  },
+  {
+    "id": "push_up",
+    "sourceId": "Pushups",
+    "name": "Flotări"
+  },
+  {
+    "id": "chest_press",
+    "sourceId": "Machine_Bench_Press",
+    "name": "Împins la aparat pentru piept"
+  },
+  {
+    "id": "dips",
+    "sourceId": "Dips_-_Chest_Version",
+    "name": "Dips la paralele"
+  },
+  {
+    "id": "pull_up",
+    "sourceId": "Pullups",
+    "name": "Tracțiuni la bară"
+  },
+  {
+    "id": "lat_pulldown",
+    "sourceId": "Wide-Grip_Lat_Pulldown",
+    "name": "Tracțiuni la helcometru"
+  },
+  {
+    "id": "barbell_row",
+    "sourceId": "Bent_Over_Barbell_Row",
+    "name": "Ramat cu bara"
+  },
+  {
+    "id": "seated_cable_row",
+    "sourceId": "Seated_Cable_Rows",
+    "name": "Ramat la cablu din șezut"
+  },
+  {
+    "id": "dumbbell_row",
+    "sourceId": "One-Arm_Dumbbell_Row",
+    "name": "Ramat unilateral cu gantera"
+  },
+  {
+    "id": "face_pull",
+    "sourceId": "Face_Pull",
+    "name": "Face pull la cablu"
+  },
+  {
+    "id": "straight_arm_pulldown",
+    "sourceId": "Straight-Arm_Pulldown",
+    "name": "Tracțiuni cu brațele întinse"
+  },
+  {
+    "id": "chest_supported_row",
+    "sourceId": "Dumbbell_Incline_Row",
+    "name": "Ramat cu pieptul sprijinit"
+  },
+  {
+    "id": "overhead_press",
+    "sourceId": "Standing_Military_Press",
+    "name": "Împins deasupra capului cu bara"
+  },
+  {
+    "id": "dumbbell_shoulder_press",
+    "sourceId": "Dumbbell_Shoulder_Press",
+    "name": "Împins pentru umeri cu gantere"
+  },
+  {
+    "id": "lateral_raise",
+    "sourceId": "Side_Lateral_Raise",
+    "name": "Ridicări laterale cu gantere"
+  },
+  {
+    "id": "front_raise",
+    "sourceId": "Front_Dumbbell_Raise",
+    "name": "Ridicări frontale cu gantere"
+  },
+  {
+    "id": "reverse_fly",
+    "sourceId": "Reverse_Flyes",
+    "name": "Fluturări inverse cu pieptul sprijinit"
+  },
+  {
+    "id": "cable_lateral_raise",
+    "sourceId": "Standing_Low-Pulley_Deltoid_Raise",
+    "name": "Ridicări laterale la cablu"
+  },
+  {
+    "id": "barbell_curl",
+    "sourceId": "Barbell_Curl",
+    "name": "Flexii pentru biceps cu bara"
+  },
+  {
+    "id": "dumbbell_curl",
+    "sourceId": "Dumbbell_Bicep_Curl",
+    "name": "Flexii cu gantere"
+  },
+  {
+    "id": "hammer_curl",
+    "sourceId": "Hammer_Curls",
+    "name": "Flexii ciocan"
+  },
+  {
+    "id": "preacher_curl",
+    "sourceId": "Preacher_Curl",
+    "name": "Flexii la banca Scott"
+  },
+  {
+    "id": "cable_curl",
+    "sourceId": "Standing_Biceps_Cable_Curl",
+    "name": "Flexii pentru biceps la cablu"
+  },
+  {
+    "id": "incline_curl",
+    "sourceId": "Incline_Dumbbell_Curl",
+    "name": "Flexii cu gantere pe bancă înclinată"
+  },
+  {
+    "id": "triceps_pushdown",
+    "sourceId": "Triceps_Pushdown",
+    "name": "Extensii pentru triceps la cablu"
+  },
+  {
+    "id": "overhead_triceps_extension",
+    "sourceId": "Cable_Rope_Overhead_Triceps_Extension",
+    "name": "Extensii triceps deasupra capului"
+  },
+  {
+    "id": "skull_crusher",
+    "sourceId": "Lying_Triceps_Press",
+    "name": "Extensii pentru triceps din culcat"
+  },
+  {
+    "id": "close_grip_press",
+    "sourceId": "Close-Grip_Barbell_Bench_Press",
+    "name": "Împins cu priză apropiată"
+  },
+  {
+    "id": "squat",
+    "sourceId": "Barbell_Squat",
+    "name": "Genuflexiuni cu bara"
+  },
+  {
+    "id": "front_squat",
+    "sourceId": "Front_Barbell_Squat",
+    "name": "Genuflexiuni frontale"
+  },
+  {
+    "id": "goblet_squat",
+    "sourceId": "Goblet_Squat",
+    "name": "Genuflexiuni goblet"
+  },
+  {
+    "id": "leg_press",
+    "sourceId": "Leg_Press",
+    "name": "Presă pentru picioare"
+  },
+  {
+    "id": "leg_extension",
+    "sourceId": "Leg_Extensions",
+    "name": "Extensii pentru cvadricepși"
+  },
+  {
+    "id": "lunge",
+    "sourceId": "Dumbbell_Lunges",
+    "name": "Fandări cu gantere"
+  },
+  {
+    "id": "bulgarian_split_squat",
+    "sourceId": "Split_Squat_with_Dumbbells",
+    "name": "Genuflexiuni bulgărești"
+  },
+  {
+    "id": "step_up",
+    "sourceId": "Dumbbell_Step_Ups",
+    "name": "Urcări pe bancă"
+  },
+  {
+    "id": "deadlift",
+    "sourceId": "Barbell_Deadlift",
+    "name": "Îndreptări cu bara"
+  },
+  {
+    "id": "romanian_deadlift",
+    "sourceId": "Romanian_Deadlift",
+    "name": "Îndreptări românești"
+  },
+  {
+    "id": "leg_curl",
+    "sourceId": "Lying_Leg_Curls",
+    "name": "Flexii femurali din culcat"
+  },
+  {
+    "id": "seated_leg_curl",
+    "sourceId": "Seated_Leg_Curl",
+    "name": "Flexii femurali din șezut"
+  },
+  {
+    "id": "hip_thrust",
+    "sourceId": "Barbell_Hip_Thrust",
+    "name": "Hip thrust cu bara"
+  },
+  {
+    "id": "glute_bridge",
+    "sourceId": "Butt_Lift_Bridge",
+    "name": "Podul fesier"
+  },
+  {
+    "id": "cable_kickback",
+    "sourceId": "One-Legged_Cable_Kickback",
+    "name": "Extensii de șold la cablu"
+  },
+  {
+    "id": "hip_abduction",
+    "sourceId": "Thigh_Abductor",
+    "name": "Abducții la aparat"
+  },
+  {
+    "id": "standing_calf_raise",
+    "sourceId": "Standing_Calf_Raises",
+    "name": "Ridicări pe vârfuri din picioare"
+  },
+  {
+    "id": "seated_calf_raise",
+    "sourceId": "Seated_Calf_Raise",
+    "name": "Ridicări pe vârfuri din șezut"
+  },
+  {
+    "id": "plank",
+    "sourceId": "Plank",
+    "name": "Planșă pe antebrațe"
+  },
+  {
+    "id": "side_plank",
+    "sourceId": "Side_Bridge",
+    "name": "Planșă laterală"
+  },
+  {
+    "id": "crunch",
+    "sourceId": "Crunches",
+    "name": "Crunch abdominal"
+  },
+  {
+    "id": "cable_crunch",
+    "sourceId": "Cable_Crunch",
+    "name": "Crunch la cablu"
+  },
+  {
+    "id": "hanging_knee_raise",
+    "sourceId": "Knee_Hip_Raise_On_Parallel_Bars",
+    "name": "Ridicări de genunchi la paralele"
+  },
+  {
+    "id": "dead_bug",
+    "sourceId": "Dead_Bug",
+    "name": "Dead bug"
+  },
+  {
+    "id": "russian_twist",
+    "sourceId": "Russian_Twist",
+    "name": "Rotații rusești"
+  },
+  {
+    "id": "bird_dog",
+    "sourceId": "",
+    "name": "Bird dog"
+  },
+  {
+    "id": "treadmill",
+    "sourceId": "Running_Treadmill",
+    "name": "Mers sau alergare pe bandă"
+  },
+  {
+    "id": "stationary_bike",
+    "sourceId": "Bicycling_Stationary",
+    "name": "Bicicletă staționară"
+  },
+  {
+    "id": "rower",
+    "sourceId": "Rowing_Stationary",
+    "name": "Vâslit la ergometru"
+  },
+  {
+    "id": "jump_rope",
+    "sourceId": "Rope_Jumping",
+    "name": "Sărituri cu coarda"
+  },
+  {
+    "id": "elliptical",
+    "sourceId": "Elliptical_Trainer",
+    "name": "Bicicletă eliptică"
+  },
+  {
+    "id": "kettlebell_swing",
+    "sourceId": "",
+    "name": "Swing cu kettlebell"
+  },
+  {
+    "id": "incline_barbell_press",
+    "sourceId": "Barbell_Incline_Bench_Press_-_Medium_Grip",
+    "name": "Împins înclinat cu bara"
+  },
+  {
+    "id": "decline_barbell_press",
+    "sourceId": "Decline_Barbell_Bench_Press",
+    "name": "Împins declinat cu bara"
+  },
+  {
+    "id": "decline_dumbbell_press",
+    "sourceId": "Decline_Dumbbell_Bench_Press",
+    "name": "Împins declinat cu gantere"
+  },
+  {
+    "id": "neutral_dumbbell_press",
+    "sourceId": "Dumbbell_Bench_Press_with_Neutral_Grip",
+    "name": "Împins cu gantere și priză neutră"
+  },
+  {
+    "id": "neutral_incline_press",
+    "sourceId": "Hammer_Grip_Incline_DB_Bench_Press",
+    "name": "Împins înclinat cu priză neutră"
+  },
+  {
+    "id": "incline_fly",
+    "sourceId": "Incline_Dumbbell_Flyes",
+    "name": "Fluturări înclinate cu gantere"
+  },
+  {
+    "id": "decline_fly",
+    "sourceId": "Decline_Dumbbell_Flyes",
+    "name": "Fluturări declinate cu gantere"
+  },
+  {
+    "id": "pec_deck",
+    "sourceId": "Butterfly",
+    "name": "Fluturări la pec deck"
+  },
+  {
+    "id": "smith_bench_press",
+    "sourceId": "Smith_Machine_Bench_Press",
+    "name": "Împins orizontal la Smith"
+  },
+  {
+    "id": "smith_incline_press",
+    "sourceId": "Smith_Machine_Incline_Bench_Press",
+    "name": "Împins înclinat la Smith"
+  },
+  {
+    "id": "flat_cable_fly",
+    "sourceId": "Flat_Bench_Cable_Flyes",
+    "name": "Fluturări la cablu din culcat"
+  },
+  {
+    "id": "single_arm_cable_fly",
+    "sourceId": "Single-Arm_Cable_Crossover",
+    "name": "Fluturare unilaterală la cablu"
+  },
+  {
+    "id": "incline_push_up",
+    "sourceId": "Incline_Push-Up",
+    "name": "Flotări cu palmele pe bancă"
+  },
+  {
+    "id": "decline_push_up",
+    "sourceId": "Decline_Push-Up",
+    "name": "Flotări cu picioarele ridicate"
+  },
+  {
+    "id": "wide_push_up",
+    "sourceId": "Push-Up_Wide",
+    "name": "Flotări cu priză largă"
+  },
+  {
+    "id": "dumbbell_pullover",
+    "sourceId": "Straight-Arm_Dumbbell_Pullover",
+    "name": "Pullover cu gantera"
+  },
+  {
+    "id": "chin_up",
+    "sourceId": "Chin-Up",
+    "name": "Tracțiuni cu priză supinată"
+  },
+  {
+    "id": "band_assisted_pull_up",
+    "sourceId": "Band_Assisted_Pull-Up",
+    "name": "Tracțiuni asistate cu bandă"
+  },
+  {
+    "id": "neutral_pulldown",
+    "sourceId": "V-Bar_Pulldown",
+    "name": "Tracțiuni la helcometru cu priză neutră"
+  },
+  {
+    "id": "underhand_pulldown",
+    "sourceId": "Underhand_Cable_Pulldowns",
+    "name": "Tracțiuni la helcometru cu priză supinată"
+  },
+  {
+    "id": "close_grip_pulldown",
+    "sourceId": "Close-Grip_Front_Lat_Pulldown",
+    "name": "Tracțiuni la helcometru cu priză apropiată"
+  },
+  {
+    "id": "t_bar_row",
+    "sourceId": "T-Bar_Row_with_Handle",
+    "name": "Ramat T-bar cu mâner"
+  },
+  {
+    "id": "underhand_barbell_row",
+    "sourceId": "Reverse_Grip_Bent-Over_Rows",
+    "name": "Ramat cu bara cu priză supinată"
+  },
+  {
+    "id": "two_dumbbell_row",
+    "sourceId": "Bent_Over_Two-Dumbbell_Row",
+    "name": "Ramat cu două gantere din aplecat"
+  },
+  {
+    "id": "one_arm_cable_row",
+    "sourceId": "Seated_One-arm_Cable_Pulley_Rows",
+    "name": "Ramat unilateral la cablu din șezut"
+  },
+  {
+    "id": "smith_row",
+    "sourceId": "Smith_Machine_Bent_Over_Row",
+    "name": "Ramat la Smith"
+  },
+  {
+    "id": "suspension_row",
+    "sourceId": "Suspended_Row",
+    "name": "Ramat la chingi"
+  },
+  {
+    "id": "scapular_pull_up",
+    "sourceId": "Scapular_Pull-Up",
+    "name": "Tracțiuni scapulare"
+  },
+  {
+    "id": "back_extension",
+    "sourceId": "Hyperextensions_Back_Extensions",
+    "name": "Extensii lombare la bancă"
+  },
+  {
+    "id": "superman",
+    "sourceId": "Superman",
+    "name": "Superman la sol"
+  },
+  {
+    "id": "dumbbell_shrug",
+    "sourceId": "Dumbbell_Shrug",
+    "name": "Ridicări din umeri cu gantere"
+  },
+  {
+    "id": "barbell_shrug",
+    "sourceId": "Barbell_Shrug",
+    "name": "Ridicări din umeri cu bara"
+  },
+  {
+    "id": "arnold_press",
+    "sourceId": "Arnold_Dumbbell_Press",
+    "name": "Împins Arnold cu gantere"
+  },
+  {
+    "id": "seated_barbell_press",
+    "sourceId": "Seated_Barbell_Military_Press",
+    "name": "Împins pentru umeri cu bara din șezut"
+  },
+  {
+    "id": "standing_dumbbell_press",
+    "sourceId": "Standing_Dumbbell_Press",
+    "name": "Împins cu gantere din picioare"
+  },
+  {
+    "id": "one_arm_shoulder_press",
+    "sourceId": "Dumbbell_One-Arm_Shoulder_Press",
+    "name": "Împins unilateral cu gantera"
+  },
+  {
+    "id": "smith_shoulder_press",
+    "sourceId": "Smith_Machine_Overhead_Shoulder_Press",
+    "name": "Împins pentru umeri la Smith"
+  },
+  {
+    "id": "machine_shoulder_press",
+    "sourceId": "Machine_Shoulder_Military_Press",
+    "name": "Împins pentru umeri la aparat"
+  },
+  {
+    "id": "seated_lateral_raise",
+    "sourceId": "Seated_Side_Lateral_Raise",
+    "name": "Ridicări laterale din șezut"
+  },
+  {
+    "id": "one_arm_lateral_raise",
+    "sourceId": "One-Arm_Side_Laterals",
+    "name": "Ridicare laterală unilaterală"
+  },
+  {
+    "id": "cable_front_raise",
+    "sourceId": "Front_Cable_Raise",
+    "name": "Ridicări frontale la cablu"
+  },
+  {
+    "id": "plate_front_raise",
+    "sourceId": "Front_Plate_Raise",
+    "name": "Ridicări frontale cu disc"
+  },
+  {
+    "id": "cable_reverse_fly",
+    "sourceId": "Cable_Rear_Delt_Fly",
+    "name": "Fluturări inverse la cablu"
+  },
+  {
+    "id": "reverse_pec_deck",
+    "sourceId": "Reverse_Machine_Flyes",
+    "name": "Fluturări inverse la aparat"
+  },
+  {
+    "id": "seated_reverse_fly",
+    "sourceId": "Seated_Bent-Over_Rear_Delt_Raise",
+    "name": "Fluturări inverse din șezut"
+  },
+  {
+    "id": "cable_external_rotation",
+    "sourceId": "External_Rotation_with_Cable",
+    "name": "Rotație externă a umărului la cablu"
+  },
+  {
+    "id": "cable_internal_rotation",
+    "sourceId": "Cable_Internal_Rotation",
+    "name": "Rotație internă a umărului la cablu"
+  },
+  {
+    "id": "band_pull_apart",
+    "sourceId": "Band_Pull_Apart",
+    "name": "Depărtări cu bandă elastică"
+  },
+  {
+    "id": "band_external_rotation",
+    "sourceId": "External_Rotation_with_Band",
+    "name": "Rotație externă cu bandă"
+  },
+  {
+    "id": "push_press",
+    "sourceId": "Push_Press",
+    "name": "Push press cu bara"
+  },
+  {
+    "id": "ez_bar_curl",
+    "sourceId": "EZ-Bar_Curl",
+    "name": "Flexii pentru biceps cu bara EZ"
+  },
+  {
+    "id": "concentration_curl",
+    "sourceId": "Concentration_Curls",
+    "name": "Flexii concentrate cu gantera"
+  },
+  {
+    "id": "cross_body_hammer_curl",
+    "sourceId": "Cross_Body_Hammer_Curl",
+    "name": "Flexii ciocan spre umărul opus"
+  },
+  {
+    "id": "reverse_barbell_curl",
+    "sourceId": "Reverse_Barbell_Curl",
+    "name": "Flexii inverse cu bara"
+  },
+  {
+    "id": "reverse_dumbbell_curl",
+    "sourceId": "Standing_Dumbbell_Reverse_Curl",
+    "name": "Flexii inverse cu gantere"
+  },
+  {
+    "id": "zottman_curl",
+    "sourceId": "Zottman_Curl",
+    "name": "Flexii Zottman"
+  },
+  {
+    "id": "rope_hammer_curl",
+    "sourceId": "Cable_Hammer_Curls_-_Rope_Attachment",
+    "name": "Flexii ciocan la cablu cu frânghie"
+  },
+  {
+    "id": "high_cable_curl",
+    "sourceId": "High_Cable_Curls",
+    "name": "Flexii la cabluri înalte"
+  },
+  {
+    "id": "cable_preacher_curl",
+    "sourceId": "Cable_Preacher_Curl",
+    "name": "Flexii Scott la cablu"
+  },
+  {
+    "id": "preacher_hammer_curl",
+    "sourceId": "Preacher_Hammer_Dumbbell_Curl",
+    "name": "Flexii ciocan la banca Scott"
+  },
+  {
+    "id": "spider_curl",
+    "sourceId": "Spider_Curl",
+    "name": "Flexii spider cu bara EZ"
+  },
+  {
+    "id": "seated_dumbbell_curl",
+    "sourceId": "Seated_Dumbbell_Curl",
+    "name": "Flexii cu gantere din șezut"
+  },
+  {
+    "id": "drag_curl",
+    "sourceId": "Drag_Curl",
+    "name": "Flexii drag cu bara"
+  },
+  {
+    "id": "rope_triceps_pushdown",
+    "sourceId": "Triceps_Pushdown_-_Rope_Attachment",
+    "name": "Extensii triceps cu frânghie"
+  },
+  {
+    "id": "reverse_triceps_pushdown",
+    "sourceId": "Reverse_Grip_Triceps_Pushdown",
+    "name": "Extensii triceps cu priză inversă"
+  },
+  {
+    "id": "seated_dumbbell_triceps",
+    "sourceId": "Seated_Triceps_Press",
+    "name": "Extensii triceps cu gantera din șezut"
+  },
+  {
+    "id": "dumbbell_triceps_kickback",
+    "sourceId": "Tricep_Dumbbell_Kickback",
+    "name": "Extensii triceps din aplecat cu gantera"
+  },
+  {
+    "id": "one_arm_overhead_triceps",
+    "sourceId": "Dumbbell_One-Arm_Triceps_Extension",
+    "name": "Extensie unilaterală deasupra capului"
+  },
+  {
+    "id": "dumbbell_skull_crusher",
+    "sourceId": "Lying_Dumbbell_Tricep_Extension",
+    "name": "Extensii triceps din culcat cu gantere"
+  },
+  {
+    "id": "bench_dip",
+    "sourceId": "Bench_Dips",
+    "name": "Dips la bancă"
+  },
+  {
+    "id": "triceps_dip",
+    "sourceId": "Dips_-_Triceps_Version",
+    "name": "Dips la paralele pentru triceps"
+  },
+  {
+    "id": "machine_triceps_extension",
+    "sourceId": "Machine_Triceps_Extension",
+    "name": "Extensii triceps la aparat"
+  },
+  {
+    "id": "close_grip_push_up",
+    "sourceId": "Push-Ups_-_Close_Triceps_Position",
+    "name": "Flotări cu priză apropiată"
+  },
+  {
+    "id": "barbell_wrist_curl",
+    "sourceId": "Palms-Up_Barbell_Wrist_Curl_Over_A_Bench",
+    "name": "Flexii ale încheieturilor cu bara"
+  },
+  {
+    "id": "reverse_wrist_curl",
+    "sourceId": "Palms-Down_Wrist_Curl_Over_A_Bench",
+    "name": "Extensii ale încheieturilor cu bara"
+  },
+  {
+    "id": "farmer_carry",
+    "sourceId": "Farmers_Walk",
+    "name": "Mersul fermierului"
+  },
+  {
+    "id": "hack_squat",
+    "sourceId": "Hack_Squat",
+    "name": "Genuflexiuni la hack squat"
+  },
+  {
+    "id": "smith_squat",
+    "sourceId": "Smith_Machine_Squat",
+    "name": "Genuflexiuni la Smith"
+  },
+  {
+    "id": "bodyweight_squat",
+    "sourceId": "Bodyweight_Squat",
+    "name": "Genuflexiuni cu greutatea corpului"
+  },
+  {
+    "id": "dumbbell_squat",
+    "sourceId": "Dumbbell_Squat",
+    "name": "Genuflexiuni cu gantere lângă corp"
+  },
+  {
+    "id": "box_squat",
+    "sourceId": "Box_Squat",
+    "name": "Genuflexiuni cu bara pe cutie"
+  },
+  {
+    "id": "barbell_lunge",
+    "sourceId": "Barbell_Lunge",
+    "name": "Fandări cu bara"
+  },
+  {
+    "id": "reverse_dumbbell_lunge",
+    "sourceId": "Dumbbell_Rear_Lunge",
+    "name": "Fandări înapoi cu gantere"
+  },
+  {
+    "id": "walking_barbell_lunge",
+    "sourceId": "Barbell_Walking_Lunge",
+    "name": "Fandări din mers cu bara"
+  },
+  {
+    "id": "walking_bodyweight_lunge",
+    "sourceId": "Bodyweight_Walking_Lunge",
+    "name": "Fandări din mers fără greutăți"
+  },
+  {
+    "id": "barbell_lateral_lunge",
+    "sourceId": "Barbell_Side_Split_Squat",
+    "name": "Fandări laterale cu bara"
+  },
+  {
+    "id": "single_leg_extension",
+    "sourceId": "Single-Leg_Leg_Extension",
+    "name": "Extensii cvadriceps unilaterale"
+  },
+  {
+    "id": "narrow_leg_press",
+    "sourceId": "Narrow_Stance_Leg_Press",
+    "name": "Presă pentru picioare cu poziție apropiată"
+  },
+  {
+    "id": "sumo_deadlift",
+    "sourceId": "Sumo_Deadlift",
+    "name": "Îndreptări sumo"
+  },
+  {
+    "id": "trap_bar_deadlift",
+    "sourceId": "Trap_Bar_Deadlift",
+    "name": "Îndreptări cu bara hexagonală"
+  },
+  {
+    "id": "dumbbell_romanian_deadlift",
+    "sourceId": "Stiff-Legged_Dumbbell_Deadlift",
+    "name": "Îndreptări cu gantere și genunchii ușor îndoiți"
+  },
+  {
+    "id": "single_leg_kettlebell_deadlift",
+    "sourceId": "Kettlebell_One-Legged_Deadlift",
+    "name": "Îndreptări pe un picior cu kettlebell"
+  },
+  {
+    "id": "good_morning",
+    "sourceId": "Good_Morning",
+    "name": "Good morning cu bara"
+  },
+  {
+    "id": "rack_pull",
+    "sourceId": "Rack_Pulls",
+    "name": "Îndreptări de pe opritoare"
+  },
+  {
+    "id": "glute_ham_raise",
+    "sourceId": "Glute_Ham_Raise",
+    "name": "Ridicări glute-ham la aparat"
+  },
+  {
+    "id": "standing_leg_curl",
+    "sourceId": "Standing_Leg_Curl",
+    "name": "Flexii femurali din picioare"
+  },
+  {
+    "id": "ball_leg_curl",
+    "sourceId": "Ball_Leg_Curl",
+    "name": "Flexii femurali pe minge fitness"
+  },
+  {
+    "id": "sliding_leg_curl",
+    "sourceId": "Platform_Hamstring_Slides",
+    "name": "Flexii femurali cu alunecare"
+  },
+  {
+    "id": "single_leg_glute_bridge",
+    "sourceId": "Single_Leg_Glute_Bridge",
+    "name": "Pod fesier pe un picior"
+  },
+  {
+    "id": "barbell_glute_bridge",
+    "sourceId": "Barbell_Glute_Bridge",
+    "name": "Pod fesier cu bara la sol"
+  },
+  {
+    "id": "cable_pull_through",
+    "sourceId": "Pull_Through",
+    "name": "Pull-through la cablu"
+  },
+  {
+    "id": "band_hip_extension",
+    "sourceId": "Hip_Extension_with_Bands",
+    "name": "Extensii de șold cu bandă"
+  },
+  {
+    "id": "quadruped_glute_kickback",
+    "sourceId": "Glute_Kickback",
+    "name": "Extensii de șold din patrupedie"
+  },
+  {
+    "id": "machine_hip_adduction",
+    "sourceId": "Thigh_Adductor",
+    "name": "Adducții la aparat"
+  },
+  {
+    "id": "cable_hip_adduction",
+    "sourceId": "Cable_Hip_Adduction",
+    "name": "Adducții de șold la cablu"
+  },
+  {
+    "id": "leg_press_calf_raise",
+    "sourceId": "Calf_Press_On_The_Leg_Press_Machine",
+    "name": "Ridicări pe vârfuri la presă"
+  },
+  {
+    "id": "dumbbell_standing_calf_raise",
+    "sourceId": "Standing_Dumbbell_Calf_Raise",
+    "name": "Ridicări pe vârfuri cu gantere"
+  },
+  {
+    "id": "smith_calf_raise",
+    "sourceId": "Smith_Machine_Calf_Raise",
+    "name": "Ridicări pe vârfuri la Smith"
+  },
+  {
+    "id": "single_leg_seated_calf_raise",
+    "sourceId": "Dumbbell_Seated_One-Leg_Calf_Raise",
+    "name": "Ridicări pe vârf pe un picior din șezut"
+  },
+  {
+    "id": "ab_wheel_rollout",
+    "sourceId": "Ab_Roller",
+    "name": "Rulări cu roata abdominală"
+  },
+  {
+    "id": "machine_crunch",
+    "sourceId": "Ab_Crunch_Machine",
+    "name": "Crunch abdominal la aparat"
+  },
+  {
+    "id": "reverse_crunch",
+    "sourceId": "Reverse_Crunch",
+    "name": "Crunch invers"
+  },
+  {
+    "id": "hanging_leg_raise",
+    "sourceId": "Hanging_Leg_Raise",
+    "name": "Ridicări de picioare la bară"
+  },
+  {
+    "id": "lying_leg_raise",
+    "sourceId": "Flat_Bench_Lying_Leg_Raise",
+    "name": "Ridicări de picioare din culcat"
+  },
+  {
+    "id": "bicycle_crunch",
+    "sourceId": "Air_Bike",
+    "name": "Bicicletă abdominală"
+  },
+  {
+    "id": "heel_touches",
+    "sourceId": "Alternate_Heel_Touchers",
+    "name": "Atingeri alternative ale călcâielor"
+  },
+  {
+    "id": "decline_crunch",
+    "sourceId": "Decline_Crunch",
+    "name": "Crunch pe bancă declinată"
+  },
+  {
+    "id": "ball_crunch",
+    "sourceId": "Exercise_Ball_Crunch",
+    "name": "Crunch pe minge fitness"
+  },
+  {
+    "id": "cable_woodchop",
+    "sourceId": "Standing_Cable_Wood_Chop",
+    "name": "Rotații diagonale la cablu"
+  },
+  {
+    "id": "dumbbell_side_bend",
+    "sourceId": "Dumbbell_Side_Bend",
+    "name": "Înclinări laterale cu gantera"
+  },
+  {
+    "id": "side_jackknife",
+    "sourceId": "Side_Jackknife",
+    "name": "Crunch lateral din culcat"
+  },
+  {
+    "id": "toe_touch_crunch",
+    "sourceId": "Toe_Touchers",
+    "name": "Crunch cu atingerea vârfurilor"
+  },
+  {
+    "id": "cocoon_crunch",
+    "sourceId": "Cocoons",
+    "name": "Crunch cu strângerea genunchilor"
+  },
+  {
+    "id": "flutter_kicks",
+    "sourceId": "Scissor_Kick",
+    "name": "Bătăi alternative ale picioarelor"
+  },
+  {
+    "id": "sit_up",
+    "sourceId": "Sit-Up",
+    "name": "Ridicări de trunchi din culcat"
+  },
+  {
+    "id": "suspension_knee_tuck",
+    "sourceId": "Suspended_Reverse_Crunch",
+    "name": "Strângeri de genunchi la chingi"
+  },
+  {
+    "id": "recumbent_bike",
+    "sourceId": "Recumbent_Bike",
+    "name": "Bicicletă cu spătar"
+  },
+  {
+    "id": "stair_climber",
+    "sourceId": "Stairmaster",
+    "name": "Urcări la aparat de trepte"
+  },
+  {
+    "id": "outdoor_cycling",
+    "sourceId": "Bicycling",
+    "name": "Ciclism în aer liber"
+  },
+  {
+    "id": "incline_treadmill_walk",
+    "sourceId": "Walking_Treadmill",
+    "name": "Mers pe bandă"
+  },
+  {
+    "id": "battle_ropes",
+    "sourceId": "Battling_Ropes",
+    "name": "Valuri cu frânghii de antrenament"
+  },
+  {
+    "id": "sled_push",
+    "sourceId": "Sled_Push",
+    "name": "Împins sania"
+  },
+  {
+    "id": "box_jump",
+    "sourceId": "Front_Box_Jump",
+    "name": "Sărituri pe cutie"
+  },
+  {
+    "id": "jump_squat",
+    "sourceId": "Freehand_Jump_Squat",
+    "name": "Genuflexiuni cu săritură"
+  },
+  {
+    "id": "plyometric_push_up",
+    "sourceId": "Plyo_Push-up",
+    "name": "Flotări pliometrice"
+  },
+  {
+    "id": "split_jump",
+    "sourceId": "Split_Jump",
+    "name": "Sărituri cu schimbarea fandării"
+  },
+  {
+    "id": "kettlebell_thruster",
+    "sourceId": "Kettlebell_Thruster",
+    "name": "Thruster cu kettlebell"
+  },
+  {
+    "id": "kettlebell_row",
+    "sourceId": "One-Arm_Kettlebell_Row",
+    "name": "Ramat unilateral cu kettlebell"
+  },
+  {
+    "id": "kettlebell_floor_press",
+    "sourceId": "One-Arm_Kettlebell_Floor_Press",
+    "name": "Împins unilateral cu kettlebell de la sol"
+  },
+  {
+    "id": "kettlebell_figure_eight",
+    "sourceId": "Kettlebell_Figure_8",
+    "name": "Treceri în opt cu kettlebell"
+  },
+  {
+    "id": "hamstring_stretch",
+    "sourceId": "Hamstring_Stretch",
+    "name": "Stretching femurali cu bandă din culcat"
+  },
+  {
+    "id": "quad_stretch",
+    "sourceId": "Quad_Stretch",
+    "name": "Stretching cvadriceps din culcat lateral"
+  },
+  {
+    "id": "hip_flexor_stretch",
+    "sourceId": "Kneeling_Hip_Flexor",
+    "name": "Stretching pentru flexorii șoldului"
+  },
+  {
+    "id": "child_pose",
+    "sourceId": "Childs_Pose",
+    "name": "Poziția copilului"
+  },
+  {
+    "id": "cat_stretch",
+    "sourceId": "Cat_Stretch",
+    "name": "Mobilizare a coloanei din patrupedie"
+  },
+  {
+    "id": "calf_stretch",
+    "sourceId": "Calf_Stretch_Hands_Against_Wall",
+    "name": "Stretching pentru gambe la perete"
+  },
+  {
+    "id": "shoulder_stretch",
+    "sourceId": "Shoulder_Stretch",
+    "name": "Stretching pentru umăr"
+  },
+  {
+    "id": "triceps_stretch",
+    "sourceId": "Triceps_Stretch",
+    "name": "Stretching pentru triceps"
+  },
+  {
+    "id": "chest_stretch",
+    "sourceId": "Chest_And_Front_Of_Shoulder_Stretch",
+    "name": "Mobilitate pentru piept cu baston"
+  },
+  {
+    "id": "hamstring_90_90",
+    "sourceId": "90_90_Hamstring",
+    "name": "Mobilitate femurali 90/90"
+  },
+  {
+    "id": "ankle_circles",
+    "sourceId": "Ankle_Circles",
+    "name": "Cercuri ale gleznei"
+  },
+  {
+    "id": "arm_circles",
+    "sourceId": "Arm_Circles",
+    "name": "Cercuri ale brațelor"
+  }
+]

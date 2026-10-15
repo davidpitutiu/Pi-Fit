@@ -25,9 +25,9 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Pi Fit citește pașii, energia activă și antrenamentele din ultimele 7 zile doar la cererea ta, pentru afișare locală. Datele nu sunt trimise către Firebase sau AI.</string>
+	<string>Pi Fit reads steps, active energy, workouts, heart rate, height and weight only when you connect. Raw readings stay local. Body measurements enter your profile only when you explicitly import them. Apple Watch live heart rate starts only when you start its workout session.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Pi Fit folosește doar acces de citire la datele de sănătate în această versiune și nu solicită permisiuni de scriere.</string>
+	<string>The iPhone app reads health records without writing them. On Apple Watch, workout-session permission runs the live heart-rate sensor session; that session is discarded when stopped.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

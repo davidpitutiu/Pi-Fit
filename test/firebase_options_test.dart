@@ -272,7 +272,7 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              contains('contul activ s-a schimbat'),
+              contains('the active account changed'),
             ),
           ),
         );
@@ -325,7 +325,7 @@ void main() {
         expect(gateway.configured, isFalse);
         expect(
           gateway.configurationIssue,
-          contains('Configurația este inclusă'),
+          contains('Configuration is bundled'),
         );
         pending.complete(_FakeFirebaseApp());
         await Future<void>.delayed(Duration.zero);

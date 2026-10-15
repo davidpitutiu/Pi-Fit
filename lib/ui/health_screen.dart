@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/health_service.dart';
 import '../state/app_store.dart';
+import 'live_heart_rate_card.dart';
 import 'theme.dart';
 
 class HealthScreen extends StatefulWidget {
@@ -61,6 +62,27 @@ class _HealthScreenState extends State<HealthScreen> {
     if (mounted) setState(() => _availability = availability);
   }
 
+  Future<void> _installProvider() async {
+    final operation = _operation;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _service.installProvider();
+      if (mounted && operation == _operation) await _inspect();
+    } catch (_) {
+      if (mounted && operation == _operation) {
+        setState(
+          () => _error =
+              'The installer could not be opened. Install or update Health Connect from your app store, then check again.',
+        );
+      }
+    } finally {
+      if (mounted && operation == _operation) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _read({required bool connect}) async {
     final operation = ++_operation;
     setState(() {
@@ -84,11 +106,113 @@ class _HealthScreenState extends State<HealthScreen> {
         _snapshot = null;
         _error = error is HealthReadException
             ? error.message
-            : 'Datele nu au putut fi citite. Verifică permisiunile în aplicația de sănătate și încearcă din nou.';
+            : 'Health data could not be read. Check permissions in your health app and try again.';
       });
     } finally {
       if (mounted && operation == _operation) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _importBody(HealthBodyRecord record) async {
+    final accountId = widget.store.accountId;
+    final operation = _operation;
+    final weight = record.kind == HealthBodyKind.weight;
+    final value = '${_number(record.value)} ${weight ? 'kg' : 'cm'}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Import ${weight ? 'weight' : 'height'}?'),
+        content: Text(
+          '$value · ${formatDate(record.measuredAt)}\n${record.sourceName}\n\nOnly this selected measurement will be saved to this profile. It can be used in reports, backups and local coaching. Online AI receives profile details only if you enable personalization. An older record will not replace a newer value in your profile.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Import measurement'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true ||
+        !mounted ||
+        accountId != widget.store.accountId ||
+        operation != _operation) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.store.recordBodyMeasurement(
+        weightKg: weight ? record.value : null,
+        heightCm: weight ? null : record.value,
+        measuredAt: record.measuredAt,
+        source: 'health',
+        sourceRecordId: record.id,
+        sourceName: record.sourceName,
+      );
+      if (mounted &&
+          accountId == widget.store.accountId &&
+          operation == _operation) {
+        toast(context, 'Measurement added to your history.');
+      }
+    } catch (error) {
+      if (mounted &&
+          accountId == widget.store.accountId &&
+          operation == _operation) {
+        setState(
+          () => _error = error
+              .toString()
+              .replaceFirst('Bad state: ', '')
+              .replaceFirst('Invalid argument(s): ', ''),
+        );
+      }
+    } finally {
+      if (mounted &&
+          accountId == widget.store.accountId &&
+          operation == _operation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Widget _bodyRecord(HealthBodyRecord record) {
+    final imported = widget.store.bodyMeasurements.any(
+      (m) => m.source == 'health' && m.sourceRecordId == record.id,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: PiCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '${record.kind == HealthBodyKind.weight ? 'Weight' : 'Height'} · ${_number(record.value)} ${record.kind == HealthBodyKind.weight ? 'kg' : 'cm'}',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '${formatDate(record.measuredAt)} · ${formatTime(record.measuredAt)}\n${record.sourceName}',
+              style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: ValueKey('health-import-${record.id}'),
+              onPressed: _busy || imported ? null : () => _importBody(record),
+              icon: Icon(imported ? Icons.check_rounded : Icons.add_rounded),
+              label: Text(
+                imported ? 'Already imported' : 'Import this measurement',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -103,9 +227,11 @@ class _HealthScreenState extends State<HealthScreen> {
     final snapshot = _snapshot;
     return GlassBackground(
       child: Scaffold(
-        appBar: AppBar(title: const Text('Sănătate și activitate')),
+        appBar: AppBar(title: const Text('Health and activity')),
         body: PageBody(
           children: [
+            LiveHeartRateCard(store: widget.store),
+            const SizedBox(height: 16),
             PiCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,11 +248,11 @@ class _HealthScreenState extends State<HealthScreen> {
                   ),
                   const SizedBox(height: 9),
                   const Text(
-                    'Pași, energie activă și înregistrări de antrenament din ultimele 7 zile, într-un singur loc.',
+                    'Steps, active energy and workouts from the last 7 days, plus available body measurements and heart rate records.',
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Datele Health sunt vizibile doar aici. Nu sunt sincronizate cu contul și nu sunt trimise antrenorului AI. Scorul tău de antrenament rămâne bazat pe jurnalul Pi Fit.',
+                    'Health data stays on this screen unless you explicitly import a body measurement. Imported values become part of your profile and can be used in reports, backups and local coaching. Online AI receives profile details only with your personalization permission. Other Health data stays here. Your training score is based on your Pi Fit journal.',
                     style: TextStyle(color: PiColors.muted(context)),
                   ),
                   const SizedBox(height: 18),
@@ -134,13 +260,13 @@ class _HealthScreenState extends State<HealthScreen> {
                     const LinearProgressIndicator()
                   else if (_availability == HealthAvailability.unsupported)
                     const Text(
-                      'Disponibil în aplicația Android prin Health Connect și pe iPhone prin Apple Health. Browserul și aplicațiile desktop nu oferă acces la aceste date.',
+                      'Available on Android through Health Connect and on iPhone through Apple Health. Browsers and desktop apps cannot access this data.',
                       key: ValueKey('health-unsupported'),
                     )
                   else if (_availability ==
                       HealthAvailability.installRequired) ...[
                     const Text(
-                      'Instalează sau actualizează Health Connect, apoi verifică din nou disponibilitatea.',
+                      'Install or update Health Connect, then check availability again.',
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -148,29 +274,24 @@ class _HealthScreenState extends State<HealthScreen> {
                       runSpacing: 10,
                       children: [
                         FilledButton(
-                          onPressed: _busy
-                              ? null
-                              : () async {
-                                  await _service.installProvider();
-                                  if (mounted) await _inspect();
-                                },
-                          child: const Text('Deschide instalarea'),
+                          onPressed: _busy ? null : _installProvider,
+                          child: const Text('Open installation'),
                         ),
                         OutlinedButton(
                           onPressed: _busy ? null : _inspect,
-                          child: const Text('Verifică din nou'),
+                          child: const Text('Check again'),
                         ),
                       ],
                     ),
                   ] else if (_availability ==
                       HealthAvailability.unavailable) ...[
                     const Text(
-                      'Serviciul de sănătate nu este disponibil aici. Health Connect necesită un dispozitiv compatibil; pe iOS verifică accesul la aplicația Sănătate.',
+                      'The health service is unavailable here. Health Connect needs a compatible device; on iOS check access to Apple Health.',
                     ),
                     const SizedBox(height: 10),
                     OutlinedButton(
                       onPressed: _busy ? null : _inspect,
-                      child: const Text('Verifică din nou'),
+                      child: const Text('Check again'),
                     ),
                   ] else ...[
                     Wrap(
@@ -183,8 +304,8 @@ class _HealthScreenState extends State<HealthScreen> {
                           icon: const Icon(Icons.health_and_safety_outlined),
                           label: Text(
                             snapshot == null
-                                ? 'Conectează și alege accesul'
-                                : 'Revede permisiunile',
+                                ? 'Connect and choose access'
+                                : 'Review permissions',
                           ),
                         ),
                         if (snapshot != null)
@@ -193,13 +314,13 @@ class _HealthScreenState extends State<HealthScreen> {
                                 ? null
                                 : () => _read(connect: false),
                             icon: const Icon(Icons.refresh_rounded),
-                            label: const Text('Actualizează'),
+                            label: const Text('Refresh'),
                           ),
                       ],
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Solicităm doar citire pentru cele 3 categorii. Poți modifica sau retrage accesul din setările Apple Health / Health Connect.',
+                      'We request read-only access to steps, active energy, workouts, weight, height and heart rate. Change or withdraw access in Apple Health or Health Connect settings.',
                       style: TextStyle(
                         fontSize: 12,
                         color: PiColors.muted(context),
@@ -225,9 +346,9 @@ class _HealthScreenState extends State<HealthScreen> {
               ),
             ),
             if (snapshot != null) ...[
-              const SectionHeading(title: 'Ultimele 7 zile'),
+              const SectionHeading(title: 'Last 7 days'),
               Text(
-                'Citire la ${formatDate(snapshot.updatedAt)} · ${formatTime(snapshot.updatedAt)}',
+                'Read at ${formatDate(snapshot.updatedAt)} · ${formatTime(snapshot.updatedAt)}',
                 style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
               ),
               const SizedBox(height: 12),
@@ -236,7 +357,7 @@ class _HealthScreenState extends State<HealthScreen> {
                   padding: EdgeInsets.only(bottom: 12),
                   child: PiCard(
                     child: Text(
-                      'Apple nu dezvăluie aplicațiilor dacă ai refuzat citirea. O listă goală poate însemna date inexistente sau acces neacordat; afișarea acestei pagini nu confirmă toate permisiunile.',
+                      'Apple does not disclose whether read access was denied. An empty list may mean no data or no permission; opening this screen does not confirm all permissions.',
                     ),
                   ),
                 ),
@@ -245,12 +366,49 @@ class _HealthScreenState extends State<HealthScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: PiCard(child: Text(warning)),
                 ),
+              if (snapshot.latestHeartRate != null) ...[
+                const SectionHeading(title: 'Latest synced heart rate'),
+                PiCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_number(snapshot.latestHeartRate!.beatsPerMinute)} bpm',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        '${formatDate(snapshot.latestHeartRate!.measuredAt)} · ${formatTime(snapshot.latestHeartRate!.measuredAt)}\n${snapshot.latestHeartRate!.sourceName}',
+                        style: TextStyle(color: PiColors.muted(context)),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'This is the latest record synced by your health platform, not a live watch reading.',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SectionHeading(title: 'Body measurements from Health'),
+              Text(
+                'Read window: up to ${snapshot.bodyLookbackDays} days. Select an individual record to import it into your profile. Nothing is imported automatically.',
+                style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+              ),
+              const SizedBox(height: 12),
+              if (snapshot.bodyRecords.isEmpty)
+                const PiCard(
+                  child: Text(
+                    'No accessible weight or height records in this read window. Check your sources and permissions.',
+                  ),
+                ),
+              ...snapshot.bodyRecords.map(_bodyRecord),
+              const SectionHeading(title: 'Steps and active energy'),
               PiCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Pași raportați de platformă',
+                      'Steps reported by your platform',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 7),
@@ -260,7 +418,7 @@ class _HealthScreenState extends State<HealthScreen> {
                     ),
                     const SizedBox(height: 5),
                     const Text(
-                      'Totalul folosește agregarea platformei. „—” înseamnă că datele nu au putut fi citite.',
+                      'Totals use platform aggregation. A dash means the data could not be read.',
                     ),
                   ],
                 ),
@@ -271,7 +429,7 @@ class _HealthScreenState extends State<HealthScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Energie activă înregistrată',
+                      'Recorded active energy',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 7),
@@ -286,14 +444,14 @@ class _HealthScreenState extends State<HealthScreen> {
                         initialValue: _energySource,
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          labelText: 'Sursa de energie',
+                          labelText: 'Energy source',
                         ),
                         items: snapshot.energySources
                             .map(
                               (source) => DropdownMenuItem(
                                 value: source,
                                 child: Text(
-                                  source.isEmpty ? 'Sursă fără nume' : source,
+                                  source.isEmpty ? 'Unnamed source' : source,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -304,12 +462,12 @@ class _HealthScreenState extends State<HealthScreen> {
                       ),
                     const SizedBox(height: 10),
                     const Text(
-                      'Afișăm o singură sursă pentru a nu aduna automat aplicații care raportează același efort. Valorile sunt înregistrări ale sursei; Pi Fit nu estimează calorii.',
+                      'One source is shown at a time to avoid adding apps that report the same activity. These are source records; Pi Fit does not estimate calories.',
                     ),
                   ],
                 ),
               ),
-              const SectionHeading(title: 'Pe zile'),
+              const SectionHeading(title: 'By day'),
               PiCard(
                 child: Column(
                   children: [
@@ -318,13 +476,13 @@ class _HealthScreenState extends State<HealthScreen> {
                         Expanded(
                           flex: 2,
                           child: Text(
-                            'Zi',
+                            'Day',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                         Expanded(
                           child: Text(
-                            'Pași',
+                            'Steps',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -363,7 +521,7 @@ class _HealthScreenState extends State<HealthScreen> {
                       ),
                     const SizedBox(height: 6),
                     Text(
-                      'Energia este grupată după începutul înregistrării. Înregistrările care trec de miezul nopții nu sunt împărțite prin estimare.',
+                      'Energy is grouped by the start of each record. Records crossing midnight are not split using estimates.',
                       style: TextStyle(
                         fontSize: 12,
                         color: PiColors.muted(context),
@@ -373,13 +531,12 @@ class _HealthScreenState extends State<HealthScreen> {
                 ),
               ),
               SectionHeading(
-                title:
-                    'Înregistrări de antrenament (${snapshot.workouts.length})',
+                title: 'Workout records (${snapshot.workouts.length})',
               ),
               if (snapshot.workouts.isEmpty)
                 const PiCard(
                   child: Text(
-                    'Nu există antrenamente accesibile în această perioadă. Verifică sursele și permisiunile în aplicația de sănătate.',
+                    'No accessible workouts in this period. Check sources and permissions in your health app.',
                   ),
                 ),
               for (final workout in snapshot.workouts)
@@ -411,7 +568,7 @@ class _HealthScreenState extends State<HealthScreen> {
                 ),
               const SizedBox(height: 5),
               Text(
-                'Înregistrările externe nu sunt importate în jurnalul Pi Fit și nu cresc streak-ul sau scorul. Nu se exportă antrenamente către platforma de sănătate în această versiune.',
+                'External workouts are not imported into the Pi Fit journal and do not increase your streak or score. This version does not write workouts to your health platform.',
                 style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
               ),
             ],
@@ -421,3 +578,7 @@ class _HealthScreenState extends State<HealthScreen> {
     );
   }
 }
+
+String _number(double value) => value == value.roundToDouble()
+    ? value.toInt().toString()
+    : value.toStringAsFixed(1);

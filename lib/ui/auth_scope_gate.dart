@@ -42,8 +42,8 @@ class _AuthScopeGateState extends State<AuthScopeGate> {
       onError: (Object error) {
         if (mounted) {
           setState(
-            () => _error =
-                'Starea contului nu a putut fi verificată. Reîncearcă.',
+            () =>
+                _error = 'Your account status could not be checked. Try again.',
           );
         }
       },
@@ -54,7 +54,7 @@ class _AuthScopeGateState extends State<AuthScopeGate> {
     final uid = user?.uid;
     final shouldSetName =
         user?.displayName?.trim().isNotEmpty == true &&
-        widget.store.name == 'Atlet';
+        widget.store.name == 'Athlete';
     if (uid == widget.store.accountId &&
         !_switching &&
         _error == null &&
@@ -75,7 +75,7 @@ class _AuthScopeGateState extends State<AuthScopeGate> {
         await widget.store.switchAccount(uid);
         if (generation != _generation || !mounted) return;
         if (user?.displayName?.trim().isNotEmpty == true &&
-            widget.store.name == 'Atlet') {
+            widget.store.name == 'Athlete') {
           await widget.store.updateProfile(
             user!.displayName!,
             widget.store.goal,
@@ -87,7 +87,7 @@ class _AuthScopeGateState extends State<AuthScopeGate> {
       } catch (error) {
         if (mounted && generation == _generation) {
           _error =
-              'Profilul nu a putut fi deschis. Datele existente au fost păstrate. ${error.toString().replaceFirst('Bad state: ', '')}';
+              'Your profile could not be opened. Your existing data is preserved. ${error.toString().replaceFirst('Bad state: ', '')}';
         }
       } finally {
         if (mounted && generation == _generation) {
@@ -135,7 +135,7 @@ class _AuthScopeGateState extends State<AuthScopeGate> {
                           if (_error == null) ...[
                             const CircularProgressIndicator(),
                             const SizedBox(height: 20),
-                            const Text('Se deschide profilul tău…'),
+                            const Text('Opening your profile…'),
                           ] else ...[
                             const Icon(Icons.person_outline_rounded, size: 42),
                             const SizedBox(height: 16),
@@ -143,7 +143,7 @@ class _AuthScopeGateState extends State<AuthScopeGate> {
                             const SizedBox(height: 20),
                             FilledButton(
                               onPressed: () => _changed(_gateway.currentUser),
-                              child: const Text('Reîncearcă'),
+                              child: const Text('Try again'),
                             ),
                             TextButton(
                               onPressed: () async {
@@ -154,12 +154,12 @@ class _AuthScopeGateState extends State<AuthScopeGate> {
                                   if (mounted) {
                                     setState(
                                       () => _error =
-                                          'Deconectarea nu a reușit. Reîncearcă.',
+                                          'Sign-out failed. Please try again.',
                                     );
                                   }
                                 }
                               },
-                              child: const Text('Revino la profilul local'),
+                              child: const Text('Return to guest profile'),
                             ),
                           ],
                         ],

@@ -1,41 +1,30 @@
 # Pi Fit ⚡
 
-Aplicație Flutter pentru jurnalul de sală: suprafețe translucide cu blur, design inspirat de iOS, Inter, accent verde electric `#C7FF3D`, light/dark/system. Cod comun Android, iOS și web pentru dezvoltare. Versiunea curentă: **0.2.0**.
+Pi Fit is a Flutter workout journal for Android and iPhone, with an English interface, frosted surfaces, light/dark themes and an electric-lime accent. Current version: **0.3.0**.
 
-**[Descarcă Pi Fit pentru Android (ARM64)](https://github.com/davidpitutiu/Pi-Fit/raw/refs/heads/main/downloads/Pi-Fit-Android-arm64.apk)** · [Alte variante și checksumuri](downloads/README.md)
+**[Download the Android ARM64 test APK](https://github.com/davidpitutiu/Pi-Fit/raw/refs/heads/main/downloads/Pi-Fit-Android-arm64.apk)** · [Other builds and checksums](downloads/README.md)
 
-## Funcționalități implementate
+## What you can do
 
-- **878 de exerciții**: toate cele 876 de înregistrări din baza externă deschisă [free-exercise-db](https://github.com/yuhonas/free-exercise-db) plus 2 mișcări Pi Fit. Catalogul complet rămâne disponibil offline. Căutare în română/engleză fără diacritice, filtre pentru grupă musculară, echipament, nivel și categorie, sortare și favorite persistente.
-- Același selector cu căutare și filtre este disponibil în timpul antrenamentului și la construirea rutinelor. Selecția multiplă este păstrată când schimbi căutarea sau filtrele.
-- 430 de imagini incluse offline pentru 216 exerciții; fotografiile celorlalte 659 de mișcări se încarcă la cerere și sunt păstrate în cache pe Android/iOS. Trei înregistrări din sursă nu au fotografii și sunt marcate corect. Galerii cu două poziții, pași și sfaturi; 218 exerciții au instrucțiuni în română, celelalte 660 păstrează instrucțiunile originale în engleză, indicate în interfață. [Sursă, licență și actualizare](docs/exercise-sources.md).
-- 8 rutine (Push/Pull/Legs, Full Body, Upper/Lower, Glutes, Home), plus constructor de rutine cu seturi, repetări și greutăți.
-- Antrenament liber sau din rutină: editare kg/repetări, bifare și adăugare/ștergere de seturi, cronometru de pauză, notițe la final. Indicatorii live folosesc seturile bifate și compară progresul aceluiași exercițiu cu istoricul propriu.
-- Salvare locală și reluarea sesiunii după repornire. Volumele și recordurile folosesc seturile finalizate, fără date demonstrative inventate.
-- Calendar lunar, programare individuală sau bulk pe 1–12 săptămâni, zile și oră configurabile, evitarea duplicatelor, ștergerea sesiunilor.
-- Remindere locale pe Android/iOS, permisiuni cerute la programare și mesaje pentru refuzuri. Notificările web nu sunt implementate. Android poate amâna reminderele în economisirea bateriei; iOS are o limită de notificări în așteptare.
-- Tab dedicat pentru progres: grafice pe 7/28/90 de zile pentru volum, seturi, sesiuni și durata înregistrată, evoluția fiecărui exercițiu, distribuția seturilor pe grupe și recorduri. Estimările 1RM Epley sunt etichetate ca estimări.
-- Streak săptămânal raportat la ținta de zile active din profil, cu seria curentă și recordul personal; zilele de pauză sunt compatibile cu obiectivul.
-- [Apple Health și Health Connect](docs/health.md): conectare explicită și citirea activității recente pe dispozitiv, cu permisiuni limitate. Aceste date rămân separate de scorul jurnalului de antrenament.
-- Scor de consecvență cu formula și datele afișate: 70% atingerea țintei de zile active în 28 de zile + 30% săptămâni în care ținta a fost atinsă. Mai multe sesiuni în aceeași zi nu aduc puncte suplimentare. Nu este un scor medical; lipsa datelor este afișată explicit.
-- Tab de profil și acces direct la login/signup. Profil sportiv: obiectiv, experiență, zile/săptămână, durată, echipament, zile preferate, vârstă, înălțime, greutate și limitări opționale. Temă, export JSON, import explicit al jurnalului local în cont, verificare email și ștergere cont cu reautentificare.
-- Integrare Firebase Authentication email/parolă, înregistrare, verificare email, resetare parolă și backup/restaurare manuală în Firestore. Configurațiile publice Android/iOS/Web pentru proiectul ales sunt incluse; Firestore necesită reguli publicate corect.
-- Pi Coach: profil și istoric detaliat, conversație cu ultimele 12 mesaje, endpoint AI autentificat, limitare de cereri și cheie păstrată pe server. Trimiterea datelor cere consimțământ explicit. Fără endpoint, recomandările locale sunt adaptate obiectivului, programului, echipamentului, limitărilor și seturilor reale, etichetate clar. Contextul local cu limitări nu este trimis automat serverului.
+- Browse **878 exercises** from the pinned open Free Exercise DB plus two original movements. Search English names or retained Romanian aliases; combine muscle, equipment, level and category filters in the library, routine builder and active workout.
+- See original scalable vector illustrations across 23 movement families, with supported positions and highlighted muscle regions. No workout photographs or remote image downloads are required. Illustrations are movement overviews; written instructions describe each exercise. [Catalog source and license](docs/exercise-sources.md).
+- Build custom routines, start a free workout, log/edit actual reps and loads, track checked versus planned sets, resume a saved workout and record optional **RPE effort from 1–10** for the last completed set.
+- Follow live elapsed/rest timers and real set, rep, volume and record changes. On-device coaching reacts to each exercise's current sets and reported effort. Suggestions can adjust the next unchecked set or start a recommended rest when selected. Online feedback additionally requires a configured backend, signed-in account and consent.
+- Enable **workout notification shortcuts** per account: **Check set** and **Skip rest** open Pi Fit and validate the current session. Android shows a system chronometer; iPhone notifications show a rest deadline. Shortcuts share the workout screen's timer. Stale/replayed actions cannot check a different set.
+- Ask Pi Coach to **create a program or modify a saved custom routine**, add/replace/remove exercises, or adjust sets/reps/duration. Review the proposed routines and optional calendar dates, then apply them in the app. Plans validate actual catalog IDs and account/routine revisions before writing. The local builder works without a language model; online structured proposals require deployment. [Coach setup](firebase/README.md).
+- Schedule individual workouts or bulk dates over 1–12 weeks, choose days/time, avoid duplicates and request local reminders on Android/iOS.
+- Explore 7/28/90-day volume, sets, sessions and duration charts; per-exercise load/estimated-1RM history; muscle distribution; an **all-time completed-workout count**; a weekly streak relative to your own target; and a fully explained consistency score. Rest days do not interrupt a weekly streak.
+- Record dated **height and weight**, update your profile, view actual measurement trends/history and explicitly import selected readings from Apple Health or Health Connect. Known Romanian profile values and old journal IDs migrate without deleting history.
+- Connect Health for steps, active energy, workouts, height, weight and timestamped heart-rate readings. Saved body readings require explicit import. Raw Health activity and heart rate are not added to backups or AI prompts.
+- On iPhone, start the included **Pi Fit Apple Watch companion** for actual sensor heart rate during a watch workout session. The phone receives live WatchConnectivity packets; fresh connected readings are labelled LIVE, stale/disconnected values are labelled accordingly. Historical Apple Health readings remain separate. This requires a signed iPhone/watch build, watch installation and device authorization. [Apple Watch and Health details](docs/health.md).
+- Create a designed **PDF report** for 7/28/90 days, custom inclusive dates or all time. Customize the title, light/dark/app appearance and sections; include workout counts, charts, journal, records, rated-set effort and saved body measurements. Preview, download/share, or print/save.
+- Use email/password signup/login, verification/reset, account-isolated local journals, explicit guest import, JSON recovery export and manual Firestore backups. Firebase public client files are included. Cloud backup access is currently denied by the project's administrative configuration; see below.
 
-Aplicația nu are încă paritate integrală cu Hevy. Feedul social, urmăritorii, aplicația de ceas, abonamentele și un catalog video exhaustiv nu sunt implementate. Catalogul extern este distribuit conform licenței sursei și nu este extras din Hevy; baza internă utilizată de Hevy nu este confirmată.
+## Run on Windows PowerShell
 
-## Pornire
-
-Flutter **3.47.7 / Dart 3.13.5**.
-
-### Windows — PowerShell
-
-Instalează [SDK-ul Flutter pentru Windows](https://docs.flutter.dev/install/manual)
-și adaugă folderul `flutter\bin` în PATH. După modificarea PATH, redeschide
-PowerShell și intră în folderul proiectului. Rulează comenzile direct:
+Install Flutter **3.47.7 / Dart 3.13.5**, add `flutter\bin` to PATH and reopen PowerShell. From this repository:
 
 ```powershell
-flutter --version
 flutter doctor
 flutter pub get --enforce-lockfile
 flutter analyze
@@ -43,97 +32,47 @@ flutter test
 flutter run -d chrome
 ```
 
-`scripts/flutterw` este un script Bash pentru mediul cloud Linux. În PowerShell,
-executarea lui afișează dialogul „Select an app to open flutterw”; închide dialogul
-și folosește comenzile `flutter` de mai sus. Dacă `flutter` nu este recunoscut,
-verifică instalarea SDK-ului și PATH înainte să continui. Pentru verificarea în
-Chrome este suficient toolchainul web; Android Studio este necesar pentru dezvoltarea
-Android, iar iOS se compilează pe macOS.
+Use `flutter` directly on Windows. `scripts/flutterw` is the Bash wrapper for the Linux cloud environment; opening it from PowerShell produces the file-association dialog.
 
-Configurația publică Firebase pentru Pi Fit este inclusă. Comanda `flutter run -d chrome`
-nu mai necesită copierea unui fișier local. Pentru alt proiect sau un endpoint AI,
-poți suprascrie configurația prin `--dart-define-from-file`; vezi
-[Firebase](firebase/README.md). SDK-ul web Firebase necesită acces la `www.gstatic.com`.
+For Android, install the Android toolchain and use a device/emulator. The minimum is **Android 8.0/API 26**, with API 36 for builds. The cloud setup uses JDK 21. iPhone/watch builds require macOS, Xcode and Apple signing; iOS minimum 15 and watchOS minimum 10.
 
-### Mediul cloud Linux
+```powershell
+flutter run -d <device-id>
+flutter build apk --release --split-per-abi
+# On macOS, refresh Flutter's generated Apple build settings before Xcode:
+flutter build ios --config-only --release
+```
 
-SDK-ul este `/workspace/flutter-sdk`; `scripts/flutterw` gestionează directoarele
-cache fără să schimbe `HOME`.
+Open `ios/Runner.xcworkspace` on macOS, select the same signing team for Runner and PiFitWatch, enable HealthKit in the provisioning profiles and install both targets on a paired iPhone/Watch. Native Apple compilation and real-device behavior have **not** been verified on this Linux host.
+
+## Firebase and online AI
+
+Public defaults for `pi-fit-663f2` are committed in `lib/firebase_options.dart`, `android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist` and `firebase/web-config.json`. Normal startup needs no copied local config or Dart defines. `scripts/configure_firebase.py` can regenerate them from replacement public exports; complete Dart defines remain optional overrides.
+
+The Web app ID is the one provided by the project owner; its minimal options currently reuse the same project's public Android API key until the full Web export is provided. Real email/password signup, login, lookup and cleanup were verified through Firebase REST. Browser SDK login remains unverified in this cloud instance because the network proxy blocks the Firebase Web SDK at `www.gstatic.com`; startup falls back to local mode after 10 seconds.
+
+Firestore own-backup reads/writes returned `403 PERMISSION_DENIED`. No rules or administrative settings were changed, and their exact cause was not confirmed. Publish/check the included per-user rules from an authorized Firebase account before relying on backups.
+
+Online AI needs the authenticated Firebase function, its HTTPS URL in `AI_COACH_URL`, and the provider key in server Secret Manager. Never put service-account credentials or an AI provider key in Flutter. Without that deployment, the app labels its personalized suggestions and program builder as local. [Deployment and privacy details](firebase/README.md).
+
+## Verification and cloud development
 
 ```bash
 cd /workspace/Pi-Fit
-./scripts/flutterw pub get --enforce-lockfile
+bash scripts/setup_cloud.sh
 ./scripts/flutterw analyze
 ./scripts/flutterw test
-./scripts/flutterw run -d chrome
+python3 -m unittest discover -s test -p 'test_configure_firebase.py' -v
+python3 scripts/import_exercise_catalog.py --check
+PATH=/workspace/node22/bin:$PATH npm --prefix firebase/functions test
+./scripts/flutterw build web --release --no-wasm-dry-run --no-web-resources-cdn
+./scripts/flutterw build apk --release --split-per-abi
 ```
 
-### Rulare și builduri mobile
+The setup script pins the SDK and verifies official toolchain downloads. Use the existing checkout; every cloud task is already isolated and does not need another Git worktree. Version-specific results and remaining device/cloud limitations are in [docs/validation.md](docs/validation.md).
 
-Pe calculatorul personal folosește comenzile `flutter` direct. Pentru Android:
-Java 17+, Android SDK API 36, acceptarea licențelor și emulator/dispozitiv.
-Pentru iOS: macOS, Xcode, CocoaPods și semnare Apple. Scaffoldingul folosește
-Android minSdk 26 (Android 8.0) și iOS 15.0. Health Connect necesită un dispozitiv compatibil și serviciul instalat/activat.
+Android downloads are release-mode **test builds signed with the previous debug key**, so they can update the previous installation. Store signing and distribution are separate. Notification delivery/actions, Apple authorization, sensor freshness and signing must be checked on actual target devices.
 
-```bash
-flutter run -d <device-id>
-flutter build apk --debug
-# APK-uri de test optimizate, separate pe arhitecturi:
-flutter build apk --release --split-per-abi
-# pe macOS, după configurarea semnării:
-flutter build ios
-```
+Screenshots: [Dark home](docs/screenshots/home-dark.png), [Light home](docs/screenshots/home-light.png), [Exercises](docs/screenshots/exercises-dark.png), [Workout](docs/screenshots/workout-demo-dark.png), [Charts](docs/screenshots/charts-demo-dark.png), [Effort feedback](docs/screenshots/live-advice-demo-dark.png), [Body history](docs/screenshots/body-measurements-demo-dark.png), [Program preview](docs/screenshots/coach-plan-demo-dark.png), [PDF example](docs/sample-report.pdf). Report/workout examples use an explicitly isolated synthetic browser journal; the app does not populate fake training data.
 
-APK-urile optimizate conțin acum și biblioteca foto offline; dimensiunile exacte sunt în `downloads/README.md`.
-Buildurile release folosesc momentan cheia de semnare debug și sunt destinate
-testării; configurează semnarea proprie înainte de distribuția în magazin.
-
-## Firebase — pi-fit-663f2
-
-Configurațiile publice de client sunt incluse în `lib/firebase_options.dart`,
-`android/app/google-services.json` și `ios/Runner/GoogleService-Info.plist`.
-Proiect: `pi-fit-663f2`; identificator Android/iOS: `com.pifit.app`.
-Nu mai trebuie să creezi `firebase/client-config.local.json` pentru pornirea obișnuită.
-
-```powershell
-flutter pub get --enforce-lockfile
-flutter run -d chrome
-```
-
-Nu pune chei de service account sau cheia AI în configurația clientului.
-Publicarea regulilor Firestore și a funcției AI se face separat, dintr-un cont
-autorizat; vezi [firebase/README.md](firebase/README.md).
-
-Backupul este explicit/manual și înlocuiește documentul curent al contului. Fiecare utilizator are un jurnal local separat, iar profilul fără cont rămâne păstrat separat. La login nu sunt amestecate automat datele; poți folosi „Importă jurnalul local” pentru a adăuga explicit antrenamentele, rutinele, calendarul și favoritele în cont. Importul păstrează copia locală și evită duplicatele. Nu există încă sincronizare automată sau combinare de conflicte între dispozitive. Exportă datele înainte de restaurarea unui backup. Fișierele locale de recuperare a datelor invalide nu sunt afișate ca sesiuni valide.
-
-Autentificarea email/parolă a fost verificată pe proiectul real cu utilizatori temporari șterși după verificare. Firestore a refuzat citirea/scrierea backupului cu `PERMISSION_DENIED`; regula sau configurația administrativă trebuie corectată înainte de a considera backupul funcțional. Serviciul AI online mai trebuie publicat și configurat; vezi `firebase/README.md`.
-
-## Verificări
-
-```bash
-flutter analyze
-flutter test
-flutter build web
-cd firebase/functions
-npm ci
-npm test
-```
-
-Testele verifică integritatea bibliotecii, serializarea, calculul volumelor, persistența sesiunilor, programarea repetată fără duplicate și fluxuri de interfață. Backendul verifică autentificarea, validarea cererilor și limitarea utilizării. Testele locale nu certifică livrarea notificărilor sau permisiunile Health pe telefon. Autentificarea reală este verificată separat; backupul Firestore este încă refuzat de Firestore cu `PERMISSION_DENIED`.
-
-Fontul Inter este distribuit sub SIL Open Font License, inclusă în `assets/fonts/OFL.txt`.
-
-## Configurația mediului cloud
-
-`bash scripts/setup_cloud.sh` reproduce instalarea Flutter fixată la commitul 3.47.7,
-Node 22.23.3 și toolchainul Android/JDK, cu verificarea checksumurilor oficiale.
-Folosește checkoutul existent; fiecare task cloud este deja izolat și nu necesită
-un Git worktree separat. Nu include configurații private în scripturile de setup.
-
-Capturi din aplicația rulată în Chromium (progresul și antrenamentul folosesc un profil demonstrativ izolat): [Dark](docs/screenshots/home-dark.png),
-[Light](docs/screenshots/home-light.png), [Progres](docs/screenshots/progress-demo-dark.png), [Grafice](docs/screenshots/charts-demo-dark.png), [Antrenament](docs/screenshots/workout-demo-dark.png).
-
-Validarea versiunii este documentată în [docs/validation.md](docs/validation.md).
-iOS și permisiunile Health/reminderele necesită verificare pe dispozitiv; iOS nu
-poate fi compilat pe acest host Linux. AI online necesită publicarea funcției și
-configurarea secretului pe server.
+Inter is distributed under the [SIL Open Font License](assets/fonts/OFL.txt).

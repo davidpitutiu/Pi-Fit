@@ -1,0 +1,2 @@
+# Keep the integrity-verified upstream PDF.js bytes unchanged.
+web/vendor/pdfjs/*.mjs -whitespace linguist-vendored

@@ -1,13 +1,15 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/models.dart';
 import '../domain/training_analytics.dart';
 import '../state/app_store.dart';
+import '../services/workout_clock.dart';
 import 'theme.dart';
 import 'exercise_image.dart';
+import 'live_workout_advice_card.dart';
+import 'live_heart_rate_card.dart';
+import 'workout_shortcuts_card.dart';
 
 class ExercisesScreen extends StatefulWidget {
   const ExercisesScreen({super.key, required this.store});
@@ -40,7 +42,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
         !widget.store.favoriteExerciseIds.contains(exercise.id),
       );
     } catch (_) {
-      if (mounted) _message(context, 'Preferința nu a putut fi salvată.');
+      if (mounted) _message(context, 'Your preference could not be saved.');
     }
   }
 
@@ -86,7 +88,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                     children: [
                       Row(
                         children: [
-                          const Expanded(child: _Eyebrow('EXERCIȚII')),
+                          const Expanded(child: _Eyebrow('EXERCISES')),
                           Icon(
                             Icons.auto_awesome_outlined,
                             size: 20,
@@ -96,7 +98,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Descoperă mișcarea.',
+                        'Find your next move.',
                         style: TextStyle(
                           fontSize: 31,
                           fontWeight: FontWeight.w800,
@@ -105,7 +107,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${exercises.length} exerciții. Găsește ce ți se potrivește.',
+                        '${exercises.length} exercises. Find the right move for you.',
                         style: TextStyle(
                           color: PiColors.muted(context),
                           fontSize: 13,
@@ -121,12 +123,12 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                             Icons.search_rounded,
                             size: 22,
                           ),
-                          hintText: 'Exercițiu, mușchi sau echipament',
+                          hintText: 'Exercise, muscle or equipment',
                           hintStyle: const TextStyle(fontSize: 13),
                           suffixIcon: _query.isEmpty
                               ? null
                               : IconButton(
-                                  tooltip: 'Șterge căutarea',
+                                  tooltip: 'Clear search',
                                   onPressed: () {
                                     _search.clear();
                                     setState(() => _query = '');
@@ -153,7 +155,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                     itemCount: muscles.length + 1,
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
-                      final label = index == 0 ? 'Toate' : muscles[index - 1];
+                      final label = index == 0 ? 'All' : muscles[index - 1];
                       return _FilterPill(
                         label: label,
                         selected: label == _filters.muscle,
@@ -174,7 +176,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                       scrollDirection: Axis.horizontal,
                       children: [
                         _FilterMenu(
-                          label: 'Echipament',
+                          label: 'Equipment',
                           value: _filters.equipment,
                           options: equipment,
                           onSelected: (value) =>
@@ -182,7 +184,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                         ),
                         const SizedBox(width: 8),
                         _FilterMenu(
-                          label: 'Nivel',
+                          label: 'Level',
                           value: _filters.difficulty,
                           options: difficulties,
                           onSelected: (value) =>
@@ -190,7 +192,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                         ),
                         const SizedBox(width: 8),
                         _FilterMenu(
-                          label: 'Categorie',
+                          label: 'Category',
                           value: _filters.category,
                           options: categories,
                           onSelected: (value) =>
@@ -199,7 +201,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                         const SizedBox(width: 8),
                         _FilterPill(
                           key: const ValueKey('favorites-filter'),
-                          label: 'Favorite',
+                          label: 'Favorites',
                           selected: _filters.favoritesOnly,
                           onTap: () => setState(
                             () => _filters.favoritesOnly =
@@ -233,21 +235,21 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                           ),
                           child: Text(
-                            'Șterge filtrele · $_filterCount',
+                            'Clear filters · $_filterCount',
                             style: const TextStyle(fontSize: 11),
                           ),
                         ),
                       PopupMenuButton<bool>(
-                        tooltip: 'Sortează exercițiile',
+                        tooltip: 'Sort exercises',
                         initialValue: _alphabetical,
                         onSelected: (value) =>
                             setState(() => _alphabetical = value),
                         itemBuilder: (_) => const [
                           PopupMenuItem(
                             value: false,
-                            child: Text('Ordinea bibliotecii'),
+                            child: Text('Library order'),
                           ),
-                          PopupMenuItem(value: true, child: Text('Nume · A–Z')),
+                          PopupMenuItem(value: true, child: Text('Name · A–Z')),
                         ],
                         icon: const Icon(Icons.sort_rounded, size: 20),
                       ),
@@ -262,16 +264,16 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                         ? Icons.favorite_border_rounded
                         : Icons.search_off_rounded,
                     title: _filters.favoritesOnly
-                        ? 'Păstrează mișcările preferate'
-                        : 'Niciun exercițiu găsit',
+                        ? 'Keep your favorite moves'
+                        : 'No exercises found',
                     description: _filters.favoritesOnly
-                        ? 'Atinge inima unui exercițiu pentru a-l găsi rapid aici.'
-                        : 'Încearcă alt nume sau elimină filtrele.',
+                        ? 'Tap the heart on an exercise to find it here.'
+                        : 'Try another name or clear the filters.',
                     action: _filterCount == 0
                         ? null
                         : TextButton(
                             onPressed: _resetFilters,
-                            child: const Text('Resetează filtrele'),
+                            child: const Text('Reset filters'),
                           ),
                   ),
                 ),
@@ -294,8 +296,8 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                         ),
                         trailing: IconButton(
                           tooltip: favorite
-                              ? 'Elimină din favorite: ${exercise.name}'
-                              : 'Adaugă la favorite: ${exercise.name}',
+                              ? 'Remove from favorites: ${exercise.name}'
+                              : 'Add to favorites: ${exercise.name}',
                           onPressed: () => _favorite(exercise),
                           icon: Icon(
                             favorite
@@ -336,16 +338,16 @@ class _FilterMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PopupMenuButton<String>(
-    tooltip: 'Filtrează după ${label.toLowerCase()}',
+    tooltip: 'Filter by ${label.toLowerCase()}',
     initialValue: value,
     onOpened: onOpened,
     onSelected: onSelected,
     constraints: const BoxConstraints(maxHeight: 480, minWidth: 190),
-    itemBuilder: (_) => ['Toate', ...options]
+    itemBuilder: (_) => ['All', ...options]
         .map(
           (option) => PopupMenuItem(
             value: option,
-            child: Text(option == 'Toate' ? 'Toate · $label' : option),
+            child: Text(option == 'All' ? 'All · $label' : option),
           ),
         )
         .toList(),
@@ -353,7 +355,7 @@ class _FilterMenu extends StatelessWidget {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 13),
       decoration: BoxDecoration(
-        color: value == 'Toate'
+        color: value == 'All'
             ? PiColors.surface(context).withValues(alpha: .55)
             : _accent(context).withValues(alpha: .12),
         borderRadius: BorderRadius.circular(20),
@@ -363,11 +365,11 @@ class _FilterMenu extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            value == 'Toate' ? label : value,
+            value == 'All' ? label : value,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: value == 'Toate'
+              color: value == 'All'
                   ? PiColors.muted(context)
                   : _accent(context),
             ),
@@ -394,7 +396,7 @@ class RoutinesScreen extends StatefulWidget {
 }
 
 class _RoutinesScreenState extends State<RoutinesScreen> {
-  String _category = 'Toate';
+  String _category = 'All';
 
   Future<void> _createRoutine() async {
     final routine = await Navigator.of(context).push<Routine>(
@@ -404,11 +406,11 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
     try {
       await widget.store.saveRoutine(routine);
       if (mounted) {
-        _message(context, 'Rutina „${routine.name}” a fost salvată.');
+        _message(context, 'Routine “${routine.name}” saved.');
       }
     } catch (error) {
       if (mounted) {
-        _message(context, 'Rutina nu a putut fi salvată. Încearcă din nou.');
+        _message(context, 'The routine could not be saved. Please try again.');
       }
     }
   }
@@ -427,19 +429,19 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
           final routines = widget.store.routines
               .where(
                 (routine) =>
-                    _category == 'Toate' || routine.category == _category,
+                    _category == 'All' || routine.category == _category,
               )
               .toList();
           return ListView(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
             children: [
-              const _Eyebrow('PLANUL TĂU. RITMUL TĂU.'),
+              const _Eyebrow('YOUR PLAN. YOUR PACE.'),
               const SizedBox(height: 10),
               Row(
                 children: [
                   const Expanded(
                     child: Text(
-                      'Antrenamente.',
+                      'Workouts.',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w800,
@@ -448,7 +450,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                     ),
                   ),
                   IconButton.filled(
-                    tooltip: 'Creează rutină',
+                    tooltip: 'Create routine',
                     onPressed: _createRoutine,
                     style: IconButton.styleFrom(
                       backgroundColor: PiColors.lime,
@@ -460,7 +462,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Un plan bun face loc progresului.',
+                'A good plan makes room for progress.',
                 style: TextStyle(color: PiColors.muted(context), height: 1.5),
               ),
               const SizedBox(height: 24),
@@ -480,7 +482,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Antrenament în desfășurare',
+                              'Workout in progress',
                               style: TextStyle(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 4),
@@ -521,7 +523,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
-                            'Azi scrii tu planul.',
+                            'Make today your own.',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -533,7 +535,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Pornește liber și adaugă exerciții pe parcurs.',
+                      'Start an empty workout and add exercises as you go.',
                       style: TextStyle(
                         color: PiColors.muted(context),
                         height: 1.5,
@@ -545,7 +547,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                       child: FilledButton.icon(
                         onPressed: () => _startTraining(context, widget.store),
                         icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Începe antrenament liber'),
+                        label: const Text('Start empty workout'),
                       ),
                     ),
                   ],
@@ -553,8 +555,8 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
               ),
               const SizedBox(height: 26),
               SectionHeading(
-                title: 'Rutine',
-                action: 'Creează',
+                title: 'Routines',
+                action: 'Create',
                 onAction: _createRoutine,
               ),
               const SizedBox(height: 14),
@@ -565,7 +567,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                   itemCount: categories.length + 1,
                   separatorBuilder: (_, index) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
-                    final label = index == 0 ? 'Toate' : categories[index - 1];
+                    final label = index == 0 ? 'All' : categories[index - 1];
                     return _FilterPill(
                       label: label,
                       selected: label == _category,
@@ -578,9 +580,8 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
               if (routines.isEmpty)
                 const _EmptyState(
                   icon: Icons.fitness_center_rounded,
-                  title: 'Următorul plan începe aici',
-                  description:
-                      'Creează o rutină cu exercițiile tale preferate.',
+                  title: 'Your next plan starts here',
+                  description: 'Build a routine with your favorite exercises.',
                 ),
               for (var index = 0; index < routines.length; index++)
                 Padding(
@@ -616,44 +617,52 @@ class ActiveWorkoutScreen extends StatefulWidget {
 }
 
 class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
-  Timer? _ticker;
-  DateTime? _restUntil;
-  int _restDuration = 90;
+  final _clock = WorkoutClock.instance;
+  DateTime? _alertedRestDeadline;
   bool _saving = false;
   final _notes = TextEditingController();
 
-  int get _restRemaining {
-    final end = _restUntil;
-    if (end == null) return 0;
-    final milliseconds = end.difference(DateTime.now()).inMilliseconds;
-    return milliseconds <= 0 ? 0 : (milliseconds / 1000).ceil();
-  }
+  int get _restRemaining => _clock.remaining;
+  int get _restDuration => _clock.restSeconds;
 
   @override
   void initState() {
     super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      if (_restUntil != null && _restRemaining == 0) {
-        _restUntil = null;
-        HapticFeedback.mediumImpact();
-        SystemSound.play(SystemSoundType.alert);
-        _message(context, 'Pauza s-a încheiat. Pregătit pentru următorul set?');
-      }
-      setState(() {});
-    });
+    final session = widget.store.activeSession;
+    if (session != null) {
+      _clock.bind(
+        sessionId: session.id,
+        startedAt: session.startedAt,
+        accountId: widget.store.accountId,
+        preferences: widget.store.preferences,
+      );
+    }
+    if (_clock.remaining == 0) _alertedRestDeadline = _clock.restEndsAt;
+    _clock.addListener(_clockChanged);
+  }
+
+  void _clockChanged() {
+    if (!mounted) return;
+    final deadline = _clock.restEndsAt;
+    if (deadline != null &&
+        _clock.remaining == 0 &&
+        deadline != _alertedRestDeadline) {
+      _alertedRestDeadline = deadline;
+      HapticFeedback.mediumImpact();
+      SystemSound.play(SystemSoundType.alert);
+      _message(context, 'Rest complete. Ready for your next set?');
+    }
+    setState(() {});
   }
 
   @override
   void dispose() {
-    _ticker?.cancel();
+    _clock.removeListener(_clockChanged);
     _notes.dispose();
     super.dispose();
   }
 
-  void _startRest() => setState(
-    () => _restUntil = DateTime.now().add(Duration(seconds: _restDuration)),
-  );
+  void _startRest() => _clock.startRest();
 
   Future<void> _addExercise() async {
     final exercise = await _pickExercise(context, widget.store);
@@ -666,31 +675,100 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       await action();
     } catch (error) {
       if (mounted) {
-        _message(
-          context,
-          'Modificarea nu a putut fi salvată. Încearcă din nou.',
-        );
+        _message(context, 'The change could not be saved. Please try again.');
       }
     }
+  }
+
+  Future<void> _rateEffort(int exerciseIndex, int setIndex) async {
+    FocusScope.of(context).unfocus();
+    final current =
+        widget.store.activeSession?.exercises[exerciseIndex].sets[setIndex];
+    if (current == null || !isValidCompletedSet(current)) return;
+    final rating = await showModalBottomSheet<double>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'How hard was your last set?',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.6,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Rate the effort you felt in set ${setIndex + 1}. Optional; this is separate from exercise difficulty.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.6,
+                  color: PiColors.muted(context),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var value = 1; value <= 10; value++)
+                    ChoiceChip(
+                      label: Text('$value'),
+                      selected: current.rpe == value,
+                      onSelected: (_) =>
+                          Navigator.pop(context, value.toDouble()),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                '1 = very easy · 10 = maximum effort',
+                style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+              ),
+              if (current.rpe != null)
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 0.0),
+                  child: const Text('Clear effort rating'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (rating == null || !mounted) return;
+    await _perform(
+      () => widget.store.updateSet(
+        exerciseIndex,
+        setIndex,
+        rpe: rating == 0 ? null : rating,
+        clearRpe: rating == 0,
+      ),
+    );
   }
 
   Future<void> _discard() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Renunți la antrenament?'),
+        title: const Text('Discard this workout?'),
         content: const Text(
-          'Seturile acestui antrenament vor fi șterse. Progresul salvat anterior rămâne în istoric.',
+          'This workout’s sets will be deleted. Previously saved workouts remain in your history.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Continuă'),
+            child: const Text('Keep going'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
-              'Renunță',
+              'Discard',
               style: TextStyle(color: Colors.redAccent),
             ),
           ),
@@ -702,7 +780,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       await widget.store.discardWorkout();
       if (mounted) Navigator.pop(context);
     } catch (error) {
-      if (mounted) _message(context, 'Antrenamentul nu a putut fi șters.');
+      if (mounted) _message(context, 'The workout could not be deleted.');
     }
   }
 
@@ -712,23 +790,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (session == null || _saving) return;
     final live = _LiveWorkoutTotals.fromSession(session, widget.store);
     if (live.completedSets == 0) {
-      _message(
-        context,
-        'Bifează cel puțin un set efectuat înainte de a salva.',
-      );
+      _message(context, 'Complete at least one set before saving.');
       return;
     }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Antrenament încheiat?'),
+        title: const Text('Finish this workout?'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${_setCount(live.completedSets)} efectuate · ${live.reps} repetări · ${_volume(live.volume)} kg volum extern\nDoar seturile bifate valide intră în progres.',
+                '${_setCount(live.completedSets)} completed · ${live.reps} reps · ${_volume(live.volume)} kg external volume\nOnly valid completed sets count toward your progress.',
                 style: TextStyle(color: PiColors.muted(context), height: 1.6),
               ),
               const SizedBox(height: 20),
@@ -737,7 +812,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 maxLines: 3,
                 maxLength: 500,
                 decoration: const InputDecoration(
-                  hintText: 'Cum te-ai simțit? Note opționale.',
+                  hintText: 'How did it feel? Add optional notes.',
                 ),
               ),
             ],
@@ -746,11 +821,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Mai continui'),
+            child: const Text('Keep training'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Salvează'),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -760,14 +835,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     try {
       await widget.store.finishWorkout(notes: _notes.text.trim());
       if (!mounted) return;
-      _message(context, 'Antrenament salvat. Încă un pas înainte!');
+      _message(context, 'Workout saved. Another step forward!');
       Navigator.pop(context);
     } catch (error) {
       if (mounted) {
         setState(() => _saving = false);
         _message(
           context,
-          'Antrenamentul nu a putut fi salvat. Datele rămân disponibile.',
+          'The workout could not be saved. Your data is still available.',
         );
       }
     }
@@ -783,12 +858,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           : _LiveWorkoutTotals.fromSession(session, widget.store);
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Antrenament în curs'),
+          title: const Text('Active workout'),
           actions: [
             TextButton(
               onPressed: _saving ? null : _finish,
               child: Text(
-                _saving ? 'Se salvează…' : 'Încheie',
+                _saving ? 'Saving…' : 'Finish',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
@@ -798,8 +873,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         body: session == null
             ? const _EmptyState(
                 icon: Icons.fitness_center_rounded,
-                title: 'Niciun antrenament activ',
-                description: 'Alege o rutină sau începe un antrenament liber.',
+                title: 'No active workout',
+                description: 'Choose a routine or start an empty workout.',
               )
             : SafeArea(
                 top: false,
@@ -808,7 +883,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                   children: [
-                    const _Eyebrow('FII PREZENT. FII MAI PUTERNIC.'),
+                    const _Eyebrow('STAY PRESENT. GET STRONGER.'),
                     const SizedBox(height: 10),
                     Text(
                       session.routineName,
@@ -819,16 +894,37 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _LiveWorkoutSummary(session: session, totals: live!),
+                    _LiveWorkoutSummary(
+                      session: session,
+                      totals: live!,
+                      elapsed: _clock.elapsed,
+                    ),
+                    const LiveHeartRateReadout(),
                     const SizedBox(height: 18),
                     _restCard(context),
+                    const SizedBox(height: 8),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      shape: const Border(),
+                      collapsedShape: const Border(),
+                      title: const Text(
+                        'Watch & workout shortcuts',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      leading: const Icon(Icons.watch_outlined, size: 20),
+                      children: [
+                        LiveHeartRateCard(store: widget.store),
+                        const SizedBox(height: 12),
+                        WorkoutShortcutsCard(store: widget.store),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     if (session.exercises.isEmpty)
                       const _EmptyState(
                         icon: Icons.add_circle_outline_rounded,
-                        title: 'Primul exercițiu te așteaptă',
-                        description:
-                            'Adaugă un exercițiu și notează fiecare set.',
+                        title: 'Your first exercise is waiting',
+                        description: 'Add an exercise and log every set.',
                       ),
                     for (
                       var exerciseIndex = 0;
@@ -837,33 +933,43 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     )
                       Padding(
                         padding: const EdgeInsets.only(bottom: 18),
-                        child: _workoutExercise(
-                          context,
-                          session,
-                          exerciseIndex,
+                        child: Column(
+                          children: [
+                            _workoutExercise(context, session, exerciseIndex),
+                            if (session.exercises[exerciseIndex].sets.any(
+                              isValidCompletedSet,
+                            )) ...[
+                              const SizedBox(height: 10),
+                              LiveWorkoutAdviceCard(
+                                key: ValueKey('advice-$exerciseIndex'),
+                                store: widget.store,
+                                exerciseIndex: exerciseIndex,
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     OutlinedButton.icon(
                       onPressed: _saving ? null : _addExercise,
                       icon: const Icon(Icons.add_rounded),
-                      label: const Text('Adaugă exercițiu'),
+                      label: const Text('Add exercise'),
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: _saving ? null : _finish,
                       icon: const Icon(Icons.check_rounded),
-                      label: const Text('Încheie și salvează'),
+                      label: const Text('Finish and save'),
                     ),
                     const SizedBox(height: 12),
                     TextButton(
                       onPressed: _saving ? null : _discard,
                       child: const Text(
-                        'Renunță la antrenament',
+                        'Discard workout',
                         style: TextStyle(color: Colors.redAccent),
                       ),
                     ),
                     Text(
-                      'Poți reveni în aplicație fără să pierzi antrenamentul. Pauza de pe acest ecran este un temporizator local.',
+                      'Your active workout is saved as you train. Rest time stays synchronized with your workout notification.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 11,
@@ -898,8 +1004,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   children: [
                     Text(
                       remaining > 0
-                          ? 'Respiră. Revino mai puternic.'
-                          : 'Pauză între seturi',
+                          ? 'Breathe. Come back stronger.'
+                          : 'Rest between sets',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
@@ -909,7 +1015,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     Text(
                       remaining > 0
                           ? _seconds(remaining)
-                          : '${_restDuration}s · după fiecare set bifat',
+                          : '${_restDuration}s · after each completed set',
                       style: TextStyle(
                         color: PiColors.muted(context),
                         fontSize: 11,
@@ -919,7 +1025,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 ),
               ),
               PopupMenuButton<int>(
-                tooltip: 'Durata pauzei',
+                tooltip: 'Rest duration',
                 initialValue: _restDuration,
                 icon: Icon(
                   Icons.tune_rounded,
@@ -934,18 +1040,15 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       ),
                     )
                     .toList(),
-                onSelected: (seconds) => setState(() {
-                  _restDuration = seconds;
-                  if (_restUntil != null) {
-                    _restUntil = DateTime.now().add(Duration(seconds: seconds));
-                  }
-                }),
+                onSelected: (seconds) {
+                  final running = _clock.remaining > 0;
+                  _clock.selectRestSeconds(seconds);
+                  if (running) _clock.startRest();
+                },
               ),
               IconButton(
-                tooltip: remaining > 0 ? 'Oprește pauza' : 'Pornește pauza',
-                onPressed: remaining > 0
-                    ? () => setState(() => _restUntil = null)
-                    : _startRest,
+                tooltip: remaining > 0 ? 'Skip rest' : 'Start rest',
+                onPressed: remaining > 0 ? _clock.skipRest : _startRest,
                 icon: Icon(
                   remaining > 0
                       ? Icons.close_rounded
@@ -968,11 +1071,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => setState(
-                    () => _restUntil = _restUntil!.add(
-                      const Duration(seconds: 30),
-                    ),
-                  ),
+                  onPressed: () => _clock.extendRest(30),
                   child: const Text('+30s', style: TextStyle(fontSize: 10)),
                 ),
               ],
@@ -994,6 +1093,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       exercise,
       widget.store.history,
     );
+    final ratedIndex = workoutExercise.sets.lastIndexWhere(isValidCompletedSet);
+    final lastSet = ratedIndex >= 0 ? workoutExercise.sets[ratedIndex] : null;
     return PiCard(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
       child: Column(
@@ -1053,7 +1154,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               const SizedBox(width: 10),
               Expanded(child: _columnLabel(context, 'REPS')),
               const SizedBox(width: 8),
-              SizedBox(width: 42, child: _columnLabel(context, 'GATA')),
+              SizedBox(width: 42, child: _columnLabel(context, 'DONE')),
               const SizedBox(width: 30),
             ],
           ),
@@ -1087,6 +1188,36 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 _perform(() => widget.store.removeSet(exerciseIndex, setIndex));
               },
             ),
+          if (lastSet != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Last set effort · set ${ratedIndex + 1}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: PiColors.muted(context),
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    key: ValueKey('rate-effort-$exerciseIndex'),
+                    onPressed: _saving
+                        ? null
+                        : () => _rateEffort(exerciseIndex, ratedIndex),
+                    icon: const Icon(Icons.speed_rounded, size: 16),
+                    label: Text(
+                      lastSet.rpe == null
+                          ? 'Rate effort'
+                          : 'RPE ${_volume(lastSet.rpe!)}/10',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           SizedBox(
             width: double.infinity,
             child: TextButton.icon(
@@ -1094,7 +1225,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   ? null
                   : () => _perform(() => widget.store.addSet(exerciseIndex)),
               icon: const Icon(Icons.add_rounded, size: 17),
-              label: const Text('Adaugă set', style: TextStyle(fontSize: 12)),
+              label: const Text('Add set', style: TextStyle(fontSize: 12)),
             ),
           ),
         ],
@@ -1209,7 +1340,7 @@ class _WorkoutSetRowState extends State<_WorkoutSetRow> {
             controller: _weight,
             focusNode: _weightFocus,
             valid: _validWeight,
-            label: 'Greutate set ${widget.number}, kg',
+            label: 'Set ${widget.number} weight, kg',
             decimal: true,
           ),
         ),
@@ -1220,7 +1351,7 @@ class _WorkoutSetRowState extends State<_WorkoutSetRow> {
             controller: _reps,
             focusNode: _repsFocus,
             valid: _validReps,
-            label: 'Repetări set ${widget.number}',
+            label: 'Set ${widget.number} reps',
           ),
         ),
         const SizedBox(width: 8),
@@ -1229,8 +1360,8 @@ class _WorkoutSetRowState extends State<_WorkoutSetRow> {
           height: 46,
           child: IconButton(
             tooltip: widget.set.completed
-                ? 'Marchează setul neefectuat'
-                : 'Marchează setul efectuat',
+                ? 'Mark set incomplete'
+                : 'Mark set complete',
             onPressed: _validWeight && _validReps
                 ? () {
                     FocusScope.of(context).unfocus();
@@ -1259,7 +1390,7 @@ class _WorkoutSetRowState extends State<_WorkoutSetRow> {
           width: 30,
           child: IconButton(
             padding: EdgeInsets.zero,
-            tooltip: 'Șterge setul ${widget.number}',
+            tooltip: 'Delete set ${widget.number}',
             onPressed: widget.onRemove,
             icon: Icon(
               Icons.remove_circle_outline_rounded,
@@ -1371,16 +1502,14 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
                 TextFormField(
                   controller: sets,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Seturi'),
+                  decoration: const InputDecoration(labelText: 'Sets'),
                   validator: (value) => _integerError(value, 1, 20),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: reps,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Repetări / set',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Reps / set'),
                   validator: (value) => _integerError(value, 1, 999),
                 ),
                 const SizedBox(height: 12),
@@ -1390,8 +1519,8 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: 'Greutate (kg)',
-                    helperText: '0 pentru greutatea corpului',
+                    labelText: 'Weight (kg)',
+                    helperText: '0 for bodyweight',
                   ),
                   validator: (value) {
                     final parsed = double.tryParse(
@@ -1401,7 +1530,7 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
                             !parsed.isFinite ||
                             parsed < 0 ||
                             parsed > 2000
-                        ? 'Introdu o greutate între 0 și 2000 kg.'
+                        ? 'Enter a weight between 0 and 2000 kg.'
                         : null;
                   },
                 ),
@@ -1412,7 +1541,7 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Anulează'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () {
@@ -1427,7 +1556,7 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
                 );
               }
             },
-            child: const Text('Aplică'),
+            child: const Text('Apply'),
           ),
         ],
       ),
@@ -1443,7 +1572,7 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
   void _save() {
     if (!_form.currentState!.validate()) return;
     if (_exercises.isEmpty) {
-      _message(context, 'Adaugă cel puțin un exercițiu.');
+      _message(context, 'Add at least one exercise.');
       return;
     }
     Navigator.pop(
@@ -1451,7 +1580,7 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
       Routine(
         id: 'custom-${DateTime.now().microsecondsSinceEpoch}',
         name: _name.text.trim(),
-        subtitle: 'Creat de tine, pentru ritmul tău.',
+        subtitle: 'Made by you, at your own pace.',
         exercises: List.of(_exercises),
         estimatedMinutes:
             (_exercises.fold<int>(
@@ -1460,7 +1589,7 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
                     ) *
                     2.5)
                 .ceil(),
-        category: 'Personalizat',
+        category: 'Custom',
       ),
     );
   }
@@ -1468,18 +1597,18 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Rutina ta'),
-      actions: [TextButton(onPressed: _save, child: const Text('Salvează'))],
+      title: const Text('Your routine'),
+      actions: [TextButton(onPressed: _save, child: const Text('Save'))],
     ),
     body: Form(
       key: _form,
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const _Eyebrow('CREEAZĂ CE ȚI SE POTRIVEȘTE'),
+          const _Eyebrow('BUILD WHAT WORKS FOR YOU'),
           const SizedBox(height: 14),
           const Text(
-            'Un plan pe măsura ta.',
+            'A plan that fits you.',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w800,
@@ -1492,22 +1621,22 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
             maxLength: 60,
             textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
-              labelText: 'Numele rutinei',
-              hintText: 'Ex. Upper body · Luni',
+              labelText: 'Routine name',
+              hintText: 'e.g. Upper body · Monday',
             ),
             validator: (value) => (value ?? '').trim().isEmpty
-                ? 'Dă un nume rutinei tale.'
+                ? 'Give your routine a name.'
                 : null,
           ),
           const SizedBox(height: 20),
-          SectionHeading(title: 'Exerciții', action: 'Adaugă', onAction: _add),
+          SectionHeading(title: 'Exercises', action: 'Add', onAction: _add),
           const SizedBox(height: 14),
           if (_exercises.isEmpty)
             const _EmptyState(
               icon: Icons.playlist_add_rounded,
-              title: 'Alege primul exercițiu',
+              title: 'Choose your first exercise',
               description:
-                  'Atinge un exercițiu adăugat pentru a modifica seturile, repetările și greutatea.',
+                  'Tap an added exercise to edit its sets, reps and weight.',
             ),
           for (var index = 0; index < _exercises.length; index++)
             Padding(
@@ -1537,7 +1666,7 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            '${_exercises[index].sets} seturi × ${_exercises[index].reps} reps · ${_weightValue(_exercises[index].weight)} kg',
+                            '${_exercises[index].sets} sets × ${_exercises[index].reps} reps · ${_weightValue(_exercises[index].weight)} kg',
                             style: TextStyle(
                               color: PiColors.muted(context),
                               fontSize: 12,
@@ -1547,7 +1676,7 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Șterge exercițiul',
+                      tooltip: 'Remove exercise',
                       onPressed: () =>
                           setState(() => _exercises.removeAt(index)),
                       icon: const Icon(Icons.close_rounded, size: 18),
@@ -1560,10 +1689,10 @@ class _RoutineBuilderState extends State<_RoutineBuilder> {
           OutlinedButton.icon(
             onPressed: _add,
             icon: const Icon(Icons.add_rounded),
-            label: const Text('Adaugă exercițiu'),
+            label: const Text('Add exercise'),
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _save, child: const Text('Salvează rutina')),
+          FilledButton(onPressed: _save, child: const Text('Save routine')),
         ],
       ),
     ),
@@ -1657,7 +1786,7 @@ class _RoutineCard extends StatelessWidget {
             _RoutineMeta(
               icon: Icons.fitness_center_rounded,
               label:
-                  '${routine.exercises.length} exerciții · ${routine.totalSets} seturi',
+                  '${routine.exercises.length} exercises · ${routine.totalSets} sets',
             ),
           ],
         ),
@@ -1682,7 +1811,7 @@ class _RoutineCard extends StatelessWidget {
               child: TextButton(
                 onPressed: onDetail,
                 child: const Text(
-                  'Vezi rutina',
+                  'View routine',
                   style: TextStyle(fontSize: 12),
                 ),
               ),
@@ -1692,7 +1821,7 @@ class _RoutineCard extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onStart,
                 icon: const Icon(Icons.play_arrow_rounded, size: 17),
-                label: const Text('Începe'),
+                label: const Text('Start'),
               ),
             ),
           ],
@@ -1833,9 +1962,14 @@ class _LiveWorkoutTotals {
 }
 
 class _LiveWorkoutSummary extends StatelessWidget {
-  const _LiveWorkoutSummary({required this.session, required this.totals});
+  const _LiveWorkoutSummary({
+    required this.session,
+    required this.totals,
+    required this.elapsed,
+  });
   final WorkoutSession session;
   final _LiveWorkoutTotals totals;
+  final Duration elapsed;
 
   @override
   Widget build(BuildContext context) => PiCard(
@@ -1847,32 +1981,32 @@ class _LiveWorkoutSummary extends StatelessWidget {
             Expanded(
               child: _LiveStat(
                 valueKey: 'live-duration',
-                value: _duration(session.duration),
-                label: 'DURATĂ',
+                value: _duration(elapsed),
+                label: 'DURATION',
               ),
             ),
             Expanded(
               child: _LiveStat(
                 valueKey: 'live-completed-sets',
                 value: '${totals.completedSets}/${session.totalSets}',
-                label: 'SETURI',
+                label: 'SETS',
               ),
             ),
             Expanded(
               child: _LiveStat(
                 valueKey: 'live-reps',
                 value: '${totals.reps}',
-                label: 'REPETĂRI',
+                label: 'REPS',
               ),
             ),
             Expanded(
               child: Tooltip(
                 message:
-                    'Volum extern = kg × repetări din seturile bifate de forță. Exclude greutatea corpului, cardio și mobilitatea.',
+                    'External volume = kg × reps from completed strength sets. Bodyweight, cardio and mobility are excluded.',
                 child: _LiveStat(
                   valueKey: 'live-volume',
                   value: _volume(totals.volume),
-                  label: 'VOLUM · KG',
+                  label: 'VOLUME · KG',
                 ),
               ),
             ),
@@ -1881,7 +2015,7 @@ class _LiveWorkoutSummary extends StatelessWidget {
         const SizedBox(height: 15),
         Semantics(
           label:
-              '${totals.completedSets} din ${session.totalSets} seturi bifate',
+              '${totals.completedSets} of ${session.totalSets} sets completed',
           child: ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
@@ -1898,7 +2032,7 @@ class _LiveWorkoutSummary extends StatelessWidget {
         Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            '${totals.completedSets} din ${session.totalSets} seturi bifate · ${session.totalSets - totals.completedSets} rămase',
+            '${totals.completedSets} of ${session.totalSets} sets completed · ${session.totalSets - totals.completedSets} remaining',
             key: const ValueKey('live-planned-completed'),
             style: TextStyle(fontSize: 10, color: PiColors.muted(context)),
           ),
@@ -2076,7 +2210,7 @@ class _LiveExercisePanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Acum · ${progress.completedSets}/${_setCount(progress.plannedSets)} · ${progress.reps} reps${weighted ? ' · ${_volume(progress.volume)} kg volum' : ''}',
+            'Now · ${progress.completedSets}/${_setCount(progress.plannedSets)} · ${progress.reps} reps${weighted ? ' · ${_volume(progress.volume)} kg volume' : ''}',
             key: ValueKey('live-exercise-${exercise.id}'),
             style: const TextStyle(
               fontSize: 10,
@@ -2087,8 +2221,8 @@ class _LiveExercisePanel extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             previous == null
-                ? 'Primul reper pentru acest exercițiu.'
-                : 'Ultima (${formatDate(previous.startedAt.toLocal())}) · ${_setCount(progress.previousSetCount)} · ${progress.previousReps} reps${weighted ? ' · ${_volume(progress.previousVolume)} kg' : ''}',
+                ? 'Your first baseline for this exercise.'
+                : 'Previous (${formatDate(previous.startedAt.toLocal())}) · ${_setCount(progress.previousSetCount)} · ${progress.previousReps} reps${weighted ? ' · ${_volume(progress.previousVolume)} kg' : ''}',
             key: ValueKey('live-previous-${exercise.id}'),
             style: TextStyle(
               fontSize: 9,
@@ -2100,9 +2234,9 @@ class _LiveExercisePanel extends StatelessWidget {
             const SizedBox(height: 5),
             Tooltip(
               message:
-                  'Estimare Epley: kg × (1 + repetări / 30), numai seturi bifate de forță cu 1–12 repetări. Nu este o recomandare de greutate.',
+                  'Epley estimate: kg × (1 + reps / 30), only completed strength sets with 1–12 reps. This is not a weight recommendation.',
               child: Text(
-                '1RM estimat · ${_volume(progress.estimatedOneRepMax!)} kg',
+                'Estimated 1RM · ${_volume(progress.estimatedOneRepMax!)} kg',
                 key: ValueKey('live-1rm-${exercise.id}'),
                 style: TextStyle(
                   fontSize: 10,
@@ -2114,7 +2248,7 @@ class _LiveExercisePanel extends StatelessWidget {
           ] else if (progress.previousEstimatedOneRepMax != null) ...[
             const SizedBox(height: 5),
             Text(
-              'Record anterior · ${_volume(progress.previousEstimatedOneRepMax!)} kg 1RM estimat',
+              'Previous record · ${_volume(progress.previousEstimatedOneRepMax!)} kg Estimated 1RM',
               style: TextStyle(fontSize: 9, color: PiColors.muted(context)),
             ),
           ],
@@ -2132,8 +2266,8 @@ class _LiveExercisePanel extends StatelessWidget {
                 Expanded(
                   child: Text(
                     progress.estimatedRecord
-                        ? 'Record estimat 1RM · +${_volume(progress.estimatedOneRepMax! - progress.previousEstimatedOneRepMax!)} kg față de ${_volume(progress.previousEstimatedOneRepMax!)} kg'
-                        : 'Record de greutate · ${_volume(progress.maxWeight)} kg (anterior ${_volume(progress.previousMaxWeight)} kg)',
+                        ? 'Estimated 1RM record · +${_volume(progress.estimatedOneRepMax! - progress.previousEstimatedOneRepMax!)} kg versus ${_volume(progress.previousEstimatedOneRepMax!)} kg'
+                        : 'Weight record · ${_volume(progress.maxWeight)} kg (previous ${_volume(progress.previousMaxWeight)} kg)',
                     key: ValueKey('live-pr-${exercise.id}'),
                     style: TextStyle(
                       fontSize: 9,
@@ -2278,7 +2412,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
         !store.favoriteExerciseIds.contains(widget.exercise.id),
       );
     } catch (_) {
-      if (mounted) _message(context, 'Preferința nu a putut fi salvată.');
+      if (mounted) _message(context, 'Your preference could not be saved.');
     }
   }
 
@@ -2289,11 +2423,11 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
     try {
       await store.addExercise(widget.exercise.id);
       if (mounted) {
-        _message(context, 'Exercițiul a fost adăugat în antrenamentul curent.');
+        _message(context, 'Exercise added to your active workout.');
         Navigator.pop(context);
       }
     } catch (_) {
-      if (mounted) _message(context, 'Exercițiul nu a putut fi adăugat.');
+      if (mounted) _message(context, 'The exercise could not be added.');
     } finally {
       if (mounted) setState(() => _adding = false);
     }
@@ -2348,8 +2482,8 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
                     if (store != null)
                       _ImageAction(
                         tooltip: favorite
-                            ? 'Elimină din favorite'
-                            : 'Adaugă la favorite',
+                            ? 'Remove from favorites'
+                            : 'Add to favorites',
                         onPressed: _favorite,
                         icon: favorite
                             ? Icons.favorite_rounded
@@ -2358,7 +2492,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
                       ),
                     const SizedBox(width: 6),
                     _ImageAction(
-                      tooltip: 'Închide detaliile',
+                      tooltip: 'Close exercise details',
                       icon: Icons.close_rounded,
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -2367,40 +2501,34 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
               ),
             ],
           ),
-          if (exercise.imageAsset.isEmpty && exercise.imageUrl.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.cloud_download_outlined,
-                    size: 13,
-                    color: PiColors.muted(context),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Fotografii externe · se descarcă la prima vizualizare.',
-                      style: TextStyle(
-                        fontSize: 9,
-                        height: 1.4,
-                        color: PiColors.muted(context),
-                      ),
-                    ),
-                  ),
-                ],
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              exerciseIllustrationCredit,
+              style: TextStyle(fontSize: 9, color: PiColors.muted(context)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Text(
+              'Movement-family illustration. Follow the exercise instructions for this variation.',
+              style: TextStyle(
+                fontSize: 9,
+                height: 1.5,
+                color: PiColors.muted(context),
               ),
             ),
+          ),
           if (exercise.sourceName.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 7),
+              padding: const EdgeInsets.only(top: 5),
               child: Text(
-                'Imagini: ${exercise.sourceName}',
+                'Exercise source: ${exercise.sourceName}',
                 maxLines: 2,
                 style: TextStyle(
-                  color: PiColors.muted(context),
                   fontSize: 9,
                   height: 1.4,
+                  color: PiColors.muted(context),
                 ),
               ),
             ),
@@ -2422,7 +2550,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
             runSpacing: 8,
             children: [
               if (exercise.instructionLanguage == 'en')
-                const _DetailTag(label: 'Instrucțiuni în engleză'),
+                const _DetailTag(label: 'English instructions'),
               for (final label in [
                 exercise.equipment,
                 exercise.difficulty,
@@ -2455,7 +2583,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
                     ),
                     const SizedBox(width: 10),
                     const Text(
-                      'Mușchi lucrați',
+                      'Target muscles',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
@@ -2474,7 +2602,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
                 if (exercise.secondaryMuscles.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
-                    'Mușchi secundari',
+                    'Secondary muscles',
                     style: TextStyle(
                       color: PiColors.muted(context),
                       fontSize: 10,
@@ -2496,12 +2624,12 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
               segments: const [
                 ButtonSegment(
                   value: false,
-                  label: Text('Tehnică'),
+                  label: Text('Technique'),
                   icon: Icon(Icons.format_list_numbered_rounded, size: 17),
                 ),
                 ButtonSegment(
                   value: true,
-                  label: Text('Sfaturi'),
+                  label: Text('Tips'),
                   icon: Icon(Icons.lightbulb_outline_rounded, size: 17),
                 ),
               ],
@@ -2513,7 +2641,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
           ),
           const SizedBox(height: 22),
           Text(
-            _tips ? 'Detaliile fac diferența' : 'Cum execuți',
+            _tips ? 'Details make the difference' : 'How to perform',
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -2523,7 +2651,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
           const SizedBox(height: 16),
           if ((_tips ? exercise.tips : exercise.steps).isEmpty)
             Text(
-              'Detaliile pentru această mișcare sunt în pregătire.',
+              'Instructions for this movement are not available yet.',
               style: TextStyle(color: PiColors.muted(context), fontSize: 12),
             ),
           for (
@@ -2572,7 +2700,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
           if (related.isNotEmpty) ...[
             const SizedBox(height: 8),
             const Text(
-              'Aceeași mișcare, alte variante',
+              'Same movement, different variations',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -2594,7 +2722,7 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
             FilledButton.icon(
               onPressed: _adding ? null : _addToWorkout,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Adaugă în antrenamentul curent'),
+              label: const Text('Add to active workout'),
             ),
           ],
         ],
@@ -2616,11 +2744,7 @@ class _ExerciseGalleryState extends State<_ExerciseGallery> {
 
   @override
   Widget build(BuildContext context) {
-    final count =
-        widget.exercise.secondaryImageAsset.isNotEmpty ||
-            widget.exercise.secondaryImageUrl.isNotEmpty
-        ? 2
-        : 1;
+    final count = exerciseIllustrationPoseCount(widget.exercise);
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: SizedBox(
@@ -2772,7 +2896,7 @@ Future<void> _showRoutine(
         ),
         const SizedBox(height: 18),
         Text(
-          '~${routine.estimatedMinutes} minute · ${routine.totalSets} seturi',
+          '~${routine.estimatedMinutes} min · ${routine.totalSets} sets',
           style: TextStyle(color: PiColors.muted(context), fontSize: 12),
         ),
         const SizedBox(height: 24),
@@ -2802,7 +2926,7 @@ Future<void> _showRoutine(
             _startTraining(context, store, routine: routine);
           },
           icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Începe antrenamentul'),
+          label: const Text('Start workout'),
         ),
       ],
     ),
@@ -2828,25 +2952,25 @@ Future<List<Exercise>?> _pickExercises(
 );
 
 class _ExerciseFilters {
-  String muscle = 'Toate';
-  String equipment = 'Toate';
-  String difficulty = 'Toate';
-  String category = 'Toate';
+  String muscle = 'All';
+  String equipment = 'All';
+  String difficulty = 'All';
+  String category = 'All';
   bool favoritesOnly = false;
 
   int get count => [
-    muscle != 'Toate',
-    equipment != 'Toate',
-    difficulty != 'Toate',
-    category != 'Toate',
+    muscle != 'All',
+    equipment != 'All',
+    difficulty != 'All',
+    category != 'All',
     favoritesOnly,
   ].where((value) => value).length;
 
   void clear() {
-    muscle = 'Toate';
-    equipment = 'Toate';
-    difficulty = 'Toate';
-    category = 'Toate';
+    muscle = 'All';
+    equipment = 'All';
+    difficulty = 'All';
+    category = 'All';
     favoritesOnly = false;
   }
 
@@ -2857,10 +2981,10 @@ class _ExerciseFilters {
   }) => exercises
       .where(
         (exercise) =>
-            (muscle == 'Toate' || exercise.muscle == muscle) &&
-            (equipment == 'Toate' || exercise.equipment == equipment) &&
-            (difficulty == 'Toate' || exercise.difficulty == difficulty) &&
-            (category == 'Toate' || exercise.category == category) &&
+            (muscle == 'All' || exercise.muscle == muscle) &&
+            (equipment == 'All' || exercise.equipment == equipment) &&
+            (difficulty == 'All' || exercise.difficulty == difficulty) &&
+            (category == 'All' || exercise.category == category) &&
             (!favoritesOnly || favorites.contains(exercise.id)) &&
             _matchesExercise(exercise, query),
       )
@@ -2947,19 +3071,19 @@ class _ExercisePickerState extends State<_ExercisePicker> {
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
           leading: IconButton(
-            tooltip: 'Închide selectorul',
+            tooltip: 'Close exercise selector',
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.close_rounded),
           ),
           title: Text(
-            widget.multiple ? 'Alege exerciții' : 'Adaugă exercițiu',
+            widget.multiple ? 'Choose exercises' : 'Add exercise',
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
           actions: [
             if (widget.multiple)
               TextButton(
                 onPressed: _selectedIds.isEmpty ? null : _confirm,
-                child: Text('Gata (${_selectedIds.length})'),
+                child: Text('Done (${_selectedIds.length})'),
               ),
           ],
         ),
@@ -2978,12 +3102,12 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                   onSubmitted: (_) => FocusScope.of(context).unfocus(),
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search_rounded),
-                    hintText: 'Nume, mușchi, echipament · RO / EN',
+                    hintText: 'Name, muscle, equipment · EN / RO',
                     hintStyle: const TextStyle(fontSize: 12),
                     suffixIcon: _search.text.isEmpty
                         ? null
                         : IconButton(
-                            tooltip: 'Șterge căutarea din selector',
+                            tooltip: 'Clear exercise search',
                             onPressed: () => setState(_search.clear),
                             icon: const Icon(Icons.close_rounded, size: 18),
                           ),
@@ -2998,28 +3122,28 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                   scrollDirection: Axis.horizontal,
                   children: [
                     menu(
-                      'Grupă',
+                      'Muscle',
                       _filters.muscle,
                       (exercise) => exercise.muscle,
                       (value) => _filters.muscle = value,
                     ),
                     const SizedBox(width: 8),
                     menu(
-                      'Echipament',
+                      'Equipment',
                       _filters.equipment,
                       (exercise) => exercise.equipment,
                       (value) => _filters.equipment = value,
                     ),
                     const SizedBox(width: 8),
                     menu(
-                      'Nivel',
+                      'Level',
                       _filters.difficulty,
                       (exercise) => exercise.difficulty,
                       (value) => _filters.difficulty = value,
                     ),
                     const SizedBox(width: 8),
                     menu(
-                      'Categorie',
+                      'Category',
                       _filters.category,
                       (exercise) => exercise.category,
                       (value) => _filters.category = value,
@@ -3027,7 +3151,7 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                     const SizedBox(width: 8),
                     _FilterPill(
                       key: const ValueKey('picker-favorites'),
-                      label: 'Favorite',
+                      label: 'Favorites',
                       selected: _filters.favoritesOnly,
                       onTap: () => setState(
                         () => _filters.favoritesOnly = !_filters.favoritesOnly,
@@ -3044,7 +3168,7 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                       child: Semantics(
                         liveRegion: true,
                         child: Text(
-                          '${_exerciseCount(filtered.length)}${widget.multiple && _selectedIds.isNotEmpty ? ' · ${_selectedIds.length} selectate' : ''}',
+                          '${_exerciseCount(filtered.length)}${widget.multiple && _selectedIds.isNotEmpty ? ' · ${_selectedIds.length} selected' : ''}',
                           style: TextStyle(
                             fontSize: 11,
                             color: PiColors.muted(context),
@@ -3057,7 +3181,7 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                         key: const ValueKey('picker-reset-filters'),
                         onPressed: () => setState(_filters.clear),
                         child: Text(
-                          'Șterge filtrele · ${_filters.count}',
+                          'Clear filters · ${_filters.count}',
                           style: const TextStyle(fontSize: 11),
                         ),
                       )
@@ -3073,10 +3197,10 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                         children: [
                           _EmptyState(
                             icon: Icons.search_off_rounded,
-                            title: 'Niciun exercițiu găsit',
+                            title: 'No exercises found',
                             description: outsideFilters > 0
-                                ? '$outsideFilters rezultate corespund căutării în afara filtrelor selectate.'
-                                : 'Încearcă un nume în română sau engleză, ori șterge filtrele.',
+                                ? '$outsideFilters matching exercises are outside your selected filters.'
+                                : 'Try an English or Romanian name, or clear the filters.',
                             action: _filters.count > 0
                                 ? TextButton(
                                     key: const ValueKey(
@@ -3085,8 +3209,8 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                                     onPressed: () => setState(_filters.clear),
                                     child: Text(
                                       outsideFilters > 0
-                                          ? 'Caută fără filtre'
-                                          : 'Resetează filtrele',
+                                          ? 'Search without filters'
+                                          : 'Reset filters',
                                     ),
                                   )
                                 : null,
@@ -3133,8 +3257,8 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                       icon: const Icon(Icons.add_rounded),
                       label: Text(
                         _selectedIds.isEmpty
-                            ? 'Selectează exercițiile'
-                            : 'Adaugă ${_exerciseCount(_selectedIds.length)}',
+                            ? 'Select exercises'
+                            : 'Add ${_exerciseCount(_selectedIds.length)}',
                       ),
                     ),
                   ),
@@ -3156,18 +3280,18 @@ Future<void> _startTraining(
     final resume = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Ai un antrenament în curs'),
+        title: const Text('You have an active workout'),
         content: const Text(
-          'Continuă sesiunea curentă. O poți încheia sau poți renunța la ea înainte de a începe alta.',
+          'Resume your current workout. Finish or discard it before starting another.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Înapoi'),
+            child: const Text('Back'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Continuă sesiunea'),
+            child: const Text('Resume workout'),
           ),
         ],
       ),
@@ -3184,17 +3308,17 @@ Future<void> _startTraining(
     if (context.mounted) _openActive(context, store);
   } catch (error) {
     if (context.mounted) {
-      _message(
-        context,
-        'Antrenamentul nu a putut fi pornit. Încearcă din nou.',
-      );
+      _message(context, 'The workout could not be started. Please try again.');
     }
   }
 }
 
 void _openActive(BuildContext context, AppStore store) =>
     Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => ActiveWorkoutScreen(store: store)),
+      MaterialPageRoute(
+        settings: const RouteSettings(name: '/workout'),
+        builder: (_) => ActiveWorkoutScreen(store: store),
+      ),
     );
 
 void _message(BuildContext context, String message) => ScaffoldMessenger.of(
@@ -3218,14 +3342,14 @@ Color _accent(BuildContext context) =>
 String? _integerError(String? value, int minimum, int maximum) {
   final parsed = int.tryParse(value ?? '');
   return parsed == null || parsed < minimum || parsed > maximum
-      ? 'Introdu un număr între $minimum și $maximum.'
+      ? 'Enter a number between $minimum and $maximum.'
       : null;
 }
 
-String _setCount(int count) => '$count ${count == 1 ? 'set' : 'seturi'}';
+String _setCount(int count) => '$count ${count == 1 ? 'set' : 'sets'}';
 
 String _exerciseCount(int count) =>
-    '$count ${count == 1 ? 'exercițiu' : 'exerciții'}';
+    '$count ${count == 1 ? 'exercise' : 'exercises'}';
 
 bool _matchesExercise(Exercise exercise, String query) {
   final haystack = _exerciseSearch(exercise);

@@ -114,9 +114,9 @@ class FirebaseGateway {
       senderId,
     ].any((value) => value.isEmpty || value.startsWith('replace-with'))) {
       throw StateError(
-        'Configurarea Firebase explicită este incompletă pentru $platformName. '
-        'Furnizează cheia publică, ID-ul aplicației, proiectul și expeditorul '
-        'sau pornește fără aceste override-uri pentru configurația inclusă.',
+        'Explicit Firebase configuration is incomplete for $platformName. '
+        'Provide the public key, app ID, project and sender '
+        'or start without these overrides to use the bundled configuration.',
       );
     }
     if (!RegExp(r'^\d+$').hasMatch(senderId) ||
@@ -124,15 +124,15 @@ class FirebaseGateway {
           '^1:${RegExp.escape(senderId)}:$platformName:[A-Za-z0-9]+\$',
         ).hasMatch(appId)) {
       throw StateError(
-        'ID-ul aplicației Firebase nu corespunde platformei $platformName '
-        'sau expeditorului configurat.',
+        'The Firebase app ID does not match $platformName '
+        'or the configured sender.',
       );
     }
     final bundleId = read('FIREBASE_IOS_BUNDLE_ID');
     if (platformName == 'ios' &&
         bundleId.isNotEmpty &&
         bundleId != 'com.pifit.app') {
-      throw StateError('Bundle ID Firebase iOS trebuie să fie com.pifit.app.');
+      throw StateError('The Firebase iOS bundle ID must be com.pifit.app.');
     }
     final authDomain = read('FIREBASE_AUTH_DOMAIN');
     final storageBucket = read('FIREBASE_STORAGE_BUCKET');
@@ -155,8 +155,8 @@ class FirebaseGateway {
       final options = resolveOptions();
       if (options == null) {
         _configurationIssue =
-            'Contul Firebase este disponibil pe Android, iOS și Web. '
-            'Pe această platformă poți folosi profilul local.';
+            'Firebase accounts are available on Android, iOS and Web. '
+            'You can use a local profile on this platform.';
         return;
       }
       // Assign only after the timeout-wrapped operation succeeds. A late SDK
@@ -166,17 +166,17 @@ class FirebaseGateway {
       _configurationIssue = null;
     } on TimeoutException {
       _configurationIssue =
-          'Conexiunea Firebase durează prea mult. Configurația este inclusă; '
-          'verifică accesul la internet și repornește aplicația. '
-          'Profilul și antrenamentele locale rămân disponibile.';
+          'Firebase is taking too long to connect. Configuration is bundled; '
+          'check internet access and restart the app. '
+          'Your local profile and workouts remain available.';
       rethrow;
     } on StateError catch (error) {
       _configurationIssue = error.message.toString();
       rethrow;
     } catch (_) {
       _configurationIssue =
-          'Firebase nu a putut porni. Configurația este inclusă; verifică '
-          'conexiunea și repornește aplicația. Modul local este disponibil.';
+          'Firebase could not start. Configuration is bundled; check '
+          'your connection and restart the app. Local mode remains available.';
       rethrow;
     }
   }
@@ -187,7 +187,7 @@ class FirebaseGateway {
       password: password,
     );
     final user = result.user;
-    if (user == null) throw StateError('Autentificarea nu a returnat un cont.');
+    if (user == null) throw StateError('Sign-in did not return an account.');
     return user.uid;
   }
 
@@ -197,7 +197,9 @@ class FirebaseGateway {
       password: password,
     );
     final user = result.user;
-    if (user == null) throw StateError('Înregistrarea nu a returnat un cont.');
+    if (user == null) {
+      throw StateError('Registration did not return an account.');
+    }
     final createdUid = user.uid;
     try {
       _requireSameUser(createdUid);
@@ -209,14 +211,14 @@ class FirebaseGateway {
     } catch (_) {
       if (currentUser?.uid != createdUid) {
         throw StateError(
-          'Contul a fost creat, dar contul activ s-a schimbat înainte să se '
-          'încheie configurarea. Conectează-te la contul creat pentru a continua.',
+          'The account was created, but the active account changed before '
+          'setup finished. Sign in to the created account to continue.',
         );
       }
       throw StateError(
-        'Contul a fost creat și ești autentificat, dar configurarea profilului '
-        'sau trimiterea emailului de verificare nu s-a încheiat. '
-        'Poți retrimite verificarea din Cont.',
+        'Your account was created and you are signed in, but profile setup '
+        'or the verification email could not be completed. '
+        'You can resend verification from Profile.',
       );
     }
     return createdUid;
@@ -235,7 +237,7 @@ class FirebaseGateway {
     _requireSameUser(user.uid);
     final refreshed = _requireUser();
     if (refreshed.emailVerified) {
-      throw StateError('Adresa de email este deja verificată.');
+      throw StateError('Your email address is already verified.');
     }
     await refreshed.sendEmailVerification();
   }
@@ -246,7 +248,7 @@ class FirebaseGateway {
     final user = _requireUser();
     final email = user.email;
     if (email == null || currentPassword.isEmpty) {
-      throw ArgumentError('Introdu parola curentă pentru a șterge contul.');
+      throw ArgumentError('Enter your current password to delete the account.');
     }
     await user.reauthenticateWithCredential(
       EmailAuthProvider.credential(email: email, password: currentPassword),
@@ -258,17 +260,17 @@ class FirebaseGateway {
     await batch.commit();
     if (currentUser?.uid != user.uid) {
       throw StateError(
-        'Backupul contului inițial a fost șters, dar contul activ s-a schimbat. '
-        'Conectează-te din nou la contul inițial pentru a încheia ștergerea.',
+        'The original account backup was deleted, but the active account changed. '
+        'Sign in to the original account to finish deleting it.',
       );
     }
     try {
       await user.delete();
     } catch (_) {
       throw StateError(
-        'Backupul cloud și profilul cloud au fost șterse, dar contul este încă '
-        'activ. Reîncearcă ștergerea pentru a elimina și contul. '
-        'Datele locale sunt păstrate.',
+        'Your cloud backup and profile were deleted, but the account is still '
+        'active. Retry deletion to remove the account too. '
+        'Local data is preserved.',
       );
     }
   }
@@ -296,7 +298,7 @@ class FirebaseGateway {
     if (_app == null) {
       throw StateError(
         _configurationIssue ??
-            'Firebase nu este configurat. Datele rămân pe acest dispozitiv.',
+            'Firebase has not started. Your data remains on this device.',
       );
     }
     return _app!;
@@ -306,7 +308,7 @@ class FirebaseGateway {
     _requireApp();
     final user = currentUser;
     if (user == null) {
-      throw StateError('Autentifică-te pentru sincronizarea în cloud.');
+      throw StateError('Sign in to use cloud backups.');
     }
     return user;
   }
@@ -314,7 +316,7 @@ class FirebaseGateway {
   void _requireSameUser(String uid) {
     if (currentUser?.uid != uid) {
       throw StateError(
-        'Contul activ s-a schimbat. Reia acțiunea în contul dorit.',
+        'The active account changed. Repeat this action in the intended account.',
       );
     }
   }

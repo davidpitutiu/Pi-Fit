@@ -7,15 +7,23 @@ import '../domain/models.dart';
 import '../domain/exercise_catalog.dart';
 import '../domain/training_analytics.dart';
 import '../domain/user_profile.dart';
+import '../domain/body_measurement.dart';
+import '../domain/coach_plan.dart';
 import '../services/notification_service.dart';
 
 class AppStore extends ChangeNotifier {
   static const profileGoals = [
-    'Forță și masă musculară',
-    'Condiție fizică',
-    'Controlul greutății',
-    'Mobilitate și recuperare',
+    'Strength and muscle',
+    'General fitness',
+    'Weight management',
+    'Mobility and recovery',
   ];
+  static const _legacyGoals = {
+    'Forță și masă musculară': 'Strength and muscle',
+    'Condiție fizică': 'General fitness',
+    'Controlul greutății': 'Weight management',
+    'Mobilitate și recuperare': 'Mobility and recovery',
+  };
   final SharedPreferences preferences;
   AppStore(this.preferences);
   String? _accountId;
@@ -23,10 +31,17 @@ class AppStore extends ChangeNotifier {
   String? get accountId => _accountId;
   Future<void> _accountSwitchQueue = Future.value();
   ThemeMode themeMode = ThemeMode.dark;
-  String name = 'Atlet';
-  String goal = 'Forță și masă musculară';
+  String name = 'Athlete';
+  String goal = 'Strength and muscle';
   UserProfile _profile = UserProfile();
   UserProfile get profile => _profile;
+  List<BodyMeasurement> _bodyMeasurements = [];
+  List<BodyMeasurement> get bodyMeasurements =>
+      List.unmodifiable(_bodyMeasurements);
+  Set<String> _appliedCoachProposalIds = {};
+  Set<String> get appliedCoachProposalIds =>
+      Set.unmodifiable(_appliedCoachProposalIds);
+  int get totalCompletedWorkouts => completedTrainingSessions(history).length;
   Set<String> _favoriteExerciseIds = {};
   Set<String> get favoriteExerciseIds => Set.unmodifiable(_favoriteExerciseIds);
   TrainingAnalytics get analytics =>
@@ -46,12 +61,12 @@ class AppStore extends ChangeNotifier {
     // its ID and training records instead of crashing or silently deleting it.
     return Exercise(
       id: id,
-      name: 'Exercițiu salvat',
-      muscle: 'Altele',
-      equipment: 'Nespecificat',
+      name: 'Saved exercise',
+      muscle: 'Other',
+      equipment: 'Unspecified',
       description:
-          'Acest exercițiu nu este disponibil în catalogul curent. '
-          'Seturile și progresul tău au fost păstrate.',
+          'This exercise is unavailable in the current catalog. '
+          'Your sets and progress have been preserved.',
     );
   }
 
@@ -88,6 +103,7 @@ class AppStore extends ChangeNotifier {
       'routines',
       'schedule',
       'favoriteExerciseIds',
+      'bodyMeasurements',
     ].any((key) => (guest[key] as List? ?? const []).isNotEmpty);
   }
 
@@ -104,11 +120,11 @@ class AppStore extends ChangeNotifier {
 
   Future<void> _importGuestJournal() async {
     if (_accountId == null) {
-      throw StateError('Autentifică-te înainte de a importa jurnalul local.');
+      throw StateError('Sign in before importing the guest journal.');
     }
     final guest = _guestJournal();
     if (guest == null) {
-      throw StateError('Nu există un jurnal local valid pentru import.');
+      throw StateError('There is no valid guest journal to import.');
     }
     final merged = exportData();
     final mergedRoutines = [...customRoutines];
@@ -176,6 +192,29 @@ class AppStore extends ChangeNotifier {
       ..._favoriteExerciseIds,
       ...List<String>.from(guest['favoriteExerciseIds'] as List? ?? const []),
     }.toList()..sort();
+    final measurements = [..._bodyMeasurements];
+    final measurementIds = measurements.map((item) => item.id).toSet();
+    final sourceIds = measurements
+        .where((item) => item.sourceRecordId != null)
+        .map((item) => '${item.source}/${item.sourceRecordId}')
+        .toSet();
+    for (final value in guest['bodyMeasurements'] as List? ?? const []) {
+      final measurement = BodyMeasurement.fromJson(_object(value));
+      final sourceKey = measurement.sourceRecordId == null
+          ? null
+          : '${measurement.source}/${measurement.sourceRecordId}';
+      if (measurementIds.contains(measurement.id) ||
+          (sourceKey != null && sourceIds.contains(sourceKey))) {
+        continue;
+      }
+      measurements.add(measurement);
+      measurementIds.add(measurement.id);
+      if (sourceKey != null) sourceIds.add(sourceKey);
+    }
+    measurements.sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
+    merged['bodyMeasurements'] = measurements
+        .map((item) => item.toJson())
+        .toList();
     if (jsonEncode(merged) == jsonEncode(exportData())) return;
     await _restoreBackup(merged);
   }
@@ -185,7 +224,7 @@ class AppStore extends ChangeNotifier {
   /// Calls are serialized because authentication can emit overlapping events.
   Future<void> switchAccount(String? uid) {
     if (uid != null && (uid.trim().isEmpty || uid.length > 128)) {
-      return Future.error(ArgumentError('Identificator de cont invalid.'));
+      return Future.error(ArgumentError('Invalid account identifier.'));
     }
     final operation = _accountSwitchQueue.then((_) => _switchAccount(uid));
     _accountSwitchQueue = operation.then<void>(
@@ -208,8 +247,8 @@ class AppStore extends ChangeNotifier {
         final preserved = await candidate._preserveRecovery(raw);
         throw FormatException(
           preserved
-              ? 'Datele acestui cont nu pot fi citite. Copia de recuperare a fost păstrată.'
-              : 'Datele acestui cont nu pot fi citite. Originalul nu a fost modificat.',
+              ? 'This account could not be opened. A recovery copy has been preserved.'
+              : 'This account could not be opened. Its original data has not been changed.',
         );
       }
     }
@@ -245,7 +284,7 @@ class AppStore extends ChangeNotifier {
         await NotificationService.instance.schedule(
           _notificationId(uid, event.id),
           event.date,
-          routineById(event.routineId)?.name ?? 'Antrenament',
+          routineById(event.routineId)?.name ?? 'Workout',
         );
         await _commit(() {
           final index = schedule.indexWhere((item) => item.id == event.id);
@@ -265,7 +304,7 @@ class AppStore extends ChangeNotifier {
     }
     if (reminderError != null) {
       persistenceError =
-          'Contul este deschis. Unele remindere nu au putut fi sincronizate pe acest dispozitiv.';
+          'Your account is open. Some reminders could not be synchronized on this device.';
       notifyListeners();
     }
   }
@@ -291,8 +330,8 @@ class AppStore extends ChangeNotifier {
     } catch (_) {
       final preserved = await _preserveRecovery(raw);
       persistenceError = preserved
-          ? 'Datele locale nu au putut fi citite. O copie de recuperare a fost păstrată.'
-          : 'Datele locale nu au putut fi citite. Datele originale nu au fost modificate.';
+          ? 'Local data could not be read. A recovery copy has been preserved.'
+          : 'Local data could not be read. Your original data has not been changed.';
     }
     notifyListeners();
   }
@@ -325,6 +364,14 @@ class AppStore extends ChangeNotifier {
     final loadedFavorites = Set<String>.from(
       data['favoriteExerciseIds'] as List? ?? const [],
     );
+    final loadedMeasurements =
+        (data['bodyMeasurements'] as List? ?? const [])
+            .map((value) => BodyMeasurement.fromJson(_object(value)))
+            .toList()
+          ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
+    final loadedProposals = Set<String>.from(
+      data['appliedCoachProposalIds'] as List? ?? const [],
+    );
     final loadedTheme = ThemeMode.values.firstWhere(
       (t) => t.name == data['theme'],
       orElse: () => ThemeMode.dark,
@@ -334,6 +381,8 @@ class AppStore extends ChangeNotifier {
     goal = loadedGoal;
     _profile = loadedProfile;
     _favoriteExerciseIds = loadedFavorites;
+    _bodyMeasurements = loadedMeasurements;
+    _appliedCoachProposalIds = loadedProposals;
     themeMode = loadedTheme;
     customRoutines = loadedRoutines;
     history = loadedHistory;
@@ -347,6 +396,8 @@ class AppStore extends ChangeNotifier {
     'goal': goal,
     'profile': profile.toJson(),
     'favoriteExerciseIds': _favoriteExerciseIds.toList()..sort(),
+    'bodyMeasurements': _bodyMeasurements.map((item) => item.toJson()).toList(),
+    'appliedCoachProposalIds': _appliedCoachProposalIds.toList()..sort(),
     'theme': themeMode.name,
     'routines': customRoutines.map((r) => r.toJson()).toList(),
     'history': history.map((r) => r.toJson()).toList(),
@@ -365,7 +416,7 @@ class AppStore extends ChangeNotifier {
     final operation = _accountSwitchQueue.then((_) async {
       if (_accountId != scope) {
         throw StateError(
-          'Contul s-a schimbat. Reîncearcă restaurarea în contul dorit.',
+          'The account changed. Try restoring again in the intended account.',
         );
       }
       await _restoreBackup(data);
@@ -395,7 +446,7 @@ class AppStore extends ChangeNotifier {
       jsonEncode(before),
     );
     if (!recoverySaved) {
-      throw StateError('Copia locală de recuperare nu a putut fi salvată.');
+      throw StateError('A local recovery copy could not be saved.');
     }
     await _writeLocal(jsonEncode(imported.exportData()));
     _restore(imported.exportData());
@@ -413,16 +464,20 @@ class AppStore extends ChangeNotifier {
     await _scheduleReminders(requested);
     if (cancellationError != null) {
       throw StateError(
-        'Backupul a fost restaurat. Unele remindere vechi nu '
-        'au putut fi anulate: $cancellationError',
+        'The backup was restored. Some previous reminders '
+        'could not be cancelled: $cancellationError',
       );
     }
   }
 
   String _profileName(String value) =>
-      value.trim().isEmpty ? 'Atlet' : value.trim();
-  String _profileGoal(String value) =>
-      profileGoals.contains(value.trim()) ? value.trim() : profileGoals.first;
+      value.trim().isEmpty || value.trim() == 'Atlet'
+      ? 'Athlete'
+      : value.trim();
+  String _profileGoal(String value) {
+    final normalized = _legacyGoals[value.trim()] ?? value.trim();
+    return profileGoals.contains(normalized) ? normalized : profileGoals.first;
+  }
 
   Future<void> _commit(void Function() change) async {
     final before = exportData();
@@ -453,7 +508,7 @@ class AppStore extends ChangeNotifier {
         await NotificationService.instance.schedule(
           _notificationId(scope, event.id),
           event.date,
-          routineById(event.routineId)?.name ?? 'Antrenament',
+          routineById(event.routineId)?.name ?? 'Workout',
         );
         if (!sameScope()) {
           // A permission sheet can outlive the signed-in profile. Remove its
@@ -479,8 +534,8 @@ class AppStore extends ChangeNotifier {
     await _save();
     if (failure != null) {
       throw StateError(
-        'Antrenamentele sunt salvate în calendar. Unele remindere '
-        'nu au putut fi programate: $failure',
+        'Your workouts are saved in the calendar. Some reminders '
+        'could not be scheduled: $failure',
       );
     }
   }
@@ -529,7 +584,7 @@ class AppStore extends ChangeNotifier {
       // The in-memory AppStore transaction still rolls back, and a recovery
       // copy is retained before a cloud restore replaces any local data.
     }
-    throw StateError('Salvarea locală a eșuat.');
+    throw StateError('Local storage failed.');
   }
 
   Future<void> setTheme(ThemeMode value) async {
@@ -551,16 +606,99 @@ class AppStore extends ChangeNotifier {
     String? newGoal,
   }) async {
     final validated = UserProfile.fromJson(value.toJson());
+    final changedWeight = validated.weightKg != profile.weightKg
+        ? validated.weightKg
+        : null;
+    final changedHeight = validated.heightCm != profile.heightCm
+        ? validated.heightCm
+        : null;
+    final measurement = changedWeight == null && changedHeight == null
+        ? null
+        : _newBodyMeasurement(weightKg: changedWeight, heightCm: changedHeight);
     await _commit(() {
       _profile = validated;
+      if (measurement != null) {
+        _bodyMeasurements = [measurement, ..._bodyMeasurements];
+      }
       if (newName != null) name = _profileName(newName);
       if (newGoal != null) goal = _profileGoal(newGoal);
     });
   }
 
+  BodyMeasurement _newBodyMeasurement({
+    double? weightKg,
+    double? heightCm,
+    DateTime? measuredAt,
+    String source = 'manual',
+    String? sourceRecordId,
+    String? sourceName,
+  }) {
+    final time = measuredAt ?? DateTime.now();
+    return BodyMeasurement(
+      id: '$source-${DateTime.now().microsecondsSinceEpoch}-${_bodyMeasurements.length}',
+      measuredAt: time,
+      weightKg: weightKg,
+      heightCm: heightCm,
+      source: source,
+      sourceRecordId: sourceRecordId,
+      sourceName: sourceName,
+    );
+  }
+
+  Future<void> recordBodyMeasurement({
+    double? weightKg,
+    double? heightCm,
+    DateTime? measuredAt,
+    String source = 'manual',
+    String? sourceRecordId,
+    String? sourceName,
+  }) async {
+    final measurement = _newBodyMeasurement(
+      weightKg: weightKg,
+      heightCm: heightCm,
+      measuredAt: measuredAt,
+      source: source,
+      sourceRecordId: sourceRecordId,
+      sourceName: sourceName,
+    );
+    if (measurement.sourceRecordId != null &&
+        _bodyMeasurements.any(
+          (item) =>
+              item.source == measurement.source &&
+              item.sourceRecordId == measurement.sourceRecordId,
+        )) {
+      return;
+    }
+    DateTime? latest(bool weight) {
+      for (final item in _bodyMeasurements) {
+        if (weight ? item.weightKg != null : item.heightCm != null) {
+          return item.measuredAt;
+        }
+      }
+      return null;
+    }
+
+    final weightDate = latest(true);
+    final heightDate = latest(false);
+    final updateWeight =
+        weightKg != null &&
+        (weightDate == null || !measurement.measuredAt.isBefore(weightDate));
+    final updateHeight =
+        heightCm != null &&
+        (heightDate == null || !measurement.measuredAt.isBefore(heightDate));
+    await _commit(() {
+      _bodyMeasurements = [measurement, ..._bodyMeasurements]
+        ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
+      _profile = profile.copyWith(
+        weightKg: updateWeight ? weightKg : null,
+        heightCm: updateHeight ? heightCm : null,
+      );
+    });
+  }
+
   Future<void> setExerciseFavorite(String id, bool value) async {
     if (value && !exercises.any((exercise) => exercise.id == id)) {
-      throw ArgumentError('Selectează un exercițiu din catalog.');
+      throw ArgumentError('Choose an exercise from the catalog.');
     }
     await _commit(() {
       _favoriteExerciseIds = {..._favoriteExerciseIds};
@@ -575,9 +713,7 @@ class AppStore extends ChangeNotifier {
   Future<void> saveRoutine(Routine routine) async {
     _validateRoutine(routine.toJson());
     if (routineTemplates.any((item) => item.id == routine.id)) {
-      throw ArgumentError(
-        'Salvează rutina personalizată cu un identificator nou.',
-      );
+      throw ArgumentError('Save the custom routine with a new identifier.');
     }
     await _commit(() {
       customRoutines.removeWhere((r) => r.id == routine.id);
@@ -585,14 +721,124 @@ class AppStore extends ChangeNotifier {
     });
   }
 
+  /// Apply a reviewed proposal as one local transaction. Generated text never
+  /// bypasses current-account, revision, catalog, or routine validation.
+  Future<void> applyCoachProposal(CoachProposal proposal) {
+    final operation = _accountSwitchQueue.then(
+      (_) => _applyCoachProposal(proposal),
+    );
+    _accountSwitchQueue = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
+  }
+
+  Future<void> _applyCoachProposal(CoachProposal proposal) async {
+    if (proposal.accountId != _accountId) {
+      throw StateError(
+        'The account changed. Generate a new plan for this account.',
+      );
+    }
+    if (_appliedCoachProposalIds.contains(proposal.id)) return;
+    if (proposal.baseRevision !=
+        coachPlanningRevision(
+          profile: profile,
+          goal: goal,
+          routines: customRoutines,
+        )) {
+      throw StateError(
+        'Your training preferences or routines changed. Generate a new plan before applying it.',
+      );
+    }
+    proposal.validate(catalog: exercises, customRoutines: customRoutines);
+    final plannedRoutines = <Routine>[];
+    for (var index = 0; index < proposal.routines.length; index++) {
+      final draft = proposal.routines[index];
+      final id = draft.targetRoutineId ?? 'coach-${proposal.id}-$index';
+      if (draft.targetRoutineId == null && routineById(id) != null) {
+        throw StateError(
+          'A proposed routine already exists. Generate a new plan.',
+        );
+      }
+      final routine = Routine(
+        id: id,
+        name: draft.name,
+        subtitle: draft.subtitle,
+        exercises: draft.exercises,
+        estimatedMinutes: draft.estimatedMinutes,
+        category: 'Custom',
+      );
+      _validateRoutine(routine.toJson());
+      plannedRoutines.add(routine);
+    }
+    final created = <ScheduledWorkout>[];
+    final planning = proposal.schedule;
+    if (planning != null) {
+      final routine = plannedRoutines[planning.routineIndex];
+      var futureDates = 0;
+      final now = DateTime.now();
+      for (var offset = 0; offset < planning.weeks * 7; offset++) {
+        final date = DateTime(
+          planning.startDate.year,
+          planning.startDate.month,
+          planning.startDate.day + offset,
+          planning.hour,
+          planning.minute,
+        );
+        if (!planning.weekdays.contains(date.weekday) || !date.isAfter(now)) {
+          continue;
+        }
+        futureDates++;
+        if (schedule.any(
+          (item) => item.routineId == routine.id && item.date == date,
+        )) {
+          continue;
+        }
+        final id = '${date.microsecondsSinceEpoch}-${routine.id}';
+        if (schedule.any((item) => item.id == id)) {
+          throw StateError(
+            'A calendar entry already uses the proposed identifier.',
+          );
+        }
+        created.add(
+          ScheduledWorkout(
+            id: id,
+            routineId: routine.id,
+            date: date,
+            reminder: false,
+          ),
+        );
+      }
+      if (futureDates == 0) {
+        throw StateError(
+          'The selected schedule has no future dates. Choose a later start date.',
+        );
+      }
+    }
+    await _commit(() {
+      final replacements = plannedRoutines.map((routine) => routine.id).toSet();
+      customRoutines = [
+        ...plannedRoutines,
+        ...customRoutines.where(
+          (routine) => !replacements.contains(routine.id),
+        ),
+      ];
+      schedule = [...schedule, ...created]
+        ..sort((a, b) => a.date.compareTo(b.date));
+      _appliedCoachProposalIds = {..._appliedCoachProposalIds, proposal.id};
+    });
+    if (planning?.reminder == true) await _scheduleReminders(created);
+  }
+
   Future<void> startEmptyWorkout() => startWorkout(
     Routine(
       id: 'free',
-      name: 'Antrenament liber',
-      subtitle: 'Construiește în ritmul tău',
+      name: 'Free workout',
+      subtitle: 'Build your own session',
       exercises: [],
       estimatedMinutes: 0,
-      category: 'Personalizat',
+      category: 'Custom',
     ),
   );
   Future<void> startWorkout(Routine routine) async {
@@ -624,7 +870,7 @@ class AppStore extends ChangeNotifier {
 
   Future<void> addExercise(String exerciseId) async {
     if (!exercises.any((exercise) => exercise.id == exerciseId)) {
-      throw ArgumentError('Selectează un exercițiu din catalog.');
+      throw ArgumentError('Choose an exercise from the catalog.');
     }
     if (activeSession == null) return;
     await _commit(
@@ -649,13 +895,16 @@ class AppStore extends ChangeNotifier {
     int? reps,
     double? weight,
     bool? completed,
+    double? rpe,
+    bool clearRpe = false,
   }) async {
     if (activeSession == null) return;
     if ((reps != null && (reps < 1 || reps > 100000)) ||
         (weight != null &&
-            (!weight.isFinite || weight < 0 || weight > 100000))) {
+            (!weight.isFinite || weight < 0 || weight > 100000)) ||
+        (rpe != null && (!rpe.isFinite || rpe < 1 || rpe > 10))) {
       throw ArgumentError(
-        'Repetările trebuie să fie pozitive, iar greutatea validă și cel puțin zero.',
+        'Repetitions must be positive and the weight must be valid and non-negative.',
       );
     }
     final exercises = [...activeSession!.exercises];
@@ -665,6 +914,8 @@ class AppStore extends ChangeNotifier {
       reps: reps,
       weight: weight,
       completed: completed,
+      rpe: rpe,
+      clearRpe: clearRpe,
     );
     exercises[exerciseIndex] = WorkoutExercise(
       exerciseId: exercise.exerciseId,
@@ -684,7 +935,7 @@ class AppStore extends ChangeNotifier {
         : exercise.sets.last;
     exercises[index] = WorkoutExercise(
       exerciseId: exercise.exerciseId,
-      sets: [...exercise.sets, last.copyWith(completed: false)],
+      sets: [...exercise.sets, last.copyWith(completed: false, clearRpe: true)],
     );
     await _commit(
       () => activeSession = activeSession!.copyWith(exercises: exercises),
@@ -708,7 +959,7 @@ class AppStore extends ChangeNotifier {
   Future<void> finishWorkout({String notes = ''}) async {
     if (activeSession == null) return;
     if (activeSession!.completedSets == 0) {
-      throw StateError('Bifează cel puțin un set înainte de salvare.');
+      throw StateError('Complete at least one set before saving.');
     }
     final finished = activeSession!.copyWith(
       finishedAt: DateTime.now(),
@@ -737,7 +988,7 @@ class AppStore extends ChangeNotifier {
         weekdays.isEmpty ||
         weekdays.any((day) => day < 1 || day > 7) ||
         routineById(routineId) == null) {
-      throw ArgumentError('Selectează o rutină, zilele și 1–12 săptămâni.');
+      throw ArgumentError('Choose a routine, weekdays and 1–12 weeks.');
     }
     var added = 0;
     final created = <ScheduledWorkout>[];
@@ -811,6 +1062,32 @@ class AppStore extends ChangeNotifier {
     if (includePrivateText) {
       profileData['limitations'] = profile.limitations;
     }
+    List<Map<String, dynamic>> sessionExercises(
+      WorkoutSession session, {
+      int max = 6,
+    }) => session.exercises.take(max).map((item) {
+      final exercise = exerciseById(item.exerciseId);
+      final completed = item.sets.where(isValidCompletedSet).toList();
+      final lastSets = completed.skip(
+        completed.length > 4 ? completed.length - 4 : 0,
+      );
+      return <String, dynamic>{
+        'exerciseId': bounded(item.exerciseId, 80),
+        'name': bounded(exercise.name, 72),
+        'muscle': bounded(exercise.muscle, 60),
+        'equipment': bounded(exercise.equipment, 60),
+        'sets': lastSets
+            .map(
+              (set) => {
+                'reps': set.reps,
+                'weight': set.weight,
+                'completed': true,
+                if (set.rpe != null) 'rpe': set.rpe,
+              },
+            )
+            .toList(),
+      };
+    }).toList();
     final recent =
         history
             .where(
@@ -830,34 +1107,7 @@ class AppStore extends ChangeNotifier {
             'startedAt': session.startedAt.toIso8601String(),
             'finishedAt': session.finishedAt!.toIso8601String(),
             'routineName': bounded(session.routineName, 72),
-            'exercises': session.exercises.take(6).map((item) {
-              final exercise = exerciseById(item.exerciseId);
-              return {
-                'exerciseId': bounded(item.exerciseId, 80),
-                'name': bounded(exercise.name, 72),
-                'muscle': bounded(exercise.muscle, 60),
-                'equipment': bounded(exercise.equipment, 60),
-                'sets': item.sets
-                    .where(
-                      (set) =>
-                          set.completed &&
-                          set.reps > 0 &&
-                          set.reps <= 1000 &&
-                          set.weight.isFinite &&
-                          set.weight >= 0 &&
-                          set.weight <= 2000,
-                    )
-                    .take(4)
-                    .map(
-                      (set) => {
-                        'reps': set.reps,
-                        'weight': set.weight,
-                        'completed': true,
-                      },
-                    )
-                    .toList(),
-              };
-            }).toList(),
+            'exercises': sessionExercises(session),
             if (includePrivateText && session.notes.isNotEmpty)
               'notes': bounded(session.notes, 400),
           },
@@ -899,13 +1149,19 @@ class AppStore extends ChangeNotifier {
             .toList(),
       },
       'recentSessions': sessionData,
+      if (activeSession != null)
+        'activeSession': {
+          'startedAt': activeSession!.startedAt.toIso8601String(),
+          'routineName': bounded(activeSession!.routineName, 72),
+          'exercises': sessionExercises(activeSession!, max: 4),
+        },
       'upcomingWorkouts': upcoming
           .take(6)
           .map(
             (item) => {
               'date': item.date.toIso8601String(),
               'routineName': bounded(
-                routineById(item.routineId)?.name ?? 'Antrenament',
+                routineById(item.routineId)?.name ?? 'Workout',
                 72,
               ),
             },
@@ -923,8 +1179,8 @@ class AppStore extends ChangeNotifier {
 }
 
 Never _invalidBackup() => throw const FormatException(
-  'Backupul este incomplet sau conține date de antrenament nevalide. '
-  'Datele de pe acest dispozitiv au fost păstrate.',
+  'The backup is incomplete or contains invalid training data. '
+  'Your data on this device has been preserved.',
 );
 
 Map<String, dynamic> _object(Object? value) {
@@ -1003,6 +1259,11 @@ void _validateSession(Map<String, dynamic> session, {required bool finished}) {
       _integer(set['reps'], min: 1, max: 100000);
       _weight(set['weight']);
       if (set['completed'] is! bool) _invalidBackup();
+      final rpe = set['rpe'];
+      if (rpe != null &&
+          (rpe is! num || !rpe.isFinite || rpe < 1 || rpe > 10)) {
+        _invalidBackup();
+      }
       if (set['completed'] == true) completedSets++;
     }
   }
@@ -1029,6 +1290,27 @@ void _validateBackup(Map<String, dynamic> data) {
     final favorites = <String>{};
     for (final id in _list(data['favoriteExerciseIds'])) {
       _uniqueId(favorites, id);
+    }
+  }
+  if (data['bodyMeasurements'] != null) {
+    final ids = <String>{};
+    final sourceIds = <String>{};
+    for (final value in _list(data['bodyMeasurements'])) {
+      final measurement = BodyMeasurement.fromJson(_object(value));
+      _uniqueId(ids, measurement.id);
+      if (measurement.sourceRecordId != null &&
+          !sourceIds.add(
+            '${measurement.source}/${measurement.sourceRecordId}',
+          )) {
+        _invalidBackup();
+      }
+    }
+  }
+  if (data['appliedCoachProposalIds'] != null) {
+    final ids = <String>{};
+    for (final id in _list(data['appliedCoachProposalIds'])) {
+      _uniqueId(ids, id);
+      if ((id as String).length > 256) _invalidBackup();
     }
   }
   final routineIds = routineTemplates.map((routine) => routine.id).toSet();

@@ -106,6 +106,25 @@ HealthDataPoint workout(String id, {DateTime? end}) => HealthDataPoint(
   sourceId: 'watch',
   sourceName: 'Ceas',
 );
+HealthDataPoint numericHealth(
+  String id,
+  HealthDataType type,
+  double value,
+  HealthDataUnit unit, {
+  DateTime? at,
+  String source = 'Scale',
+}) => HealthDataPoint(
+  uuid: id,
+  value: NumericHealthValue(numericValue: value),
+  type: type,
+  unit: unit,
+  dateFrom: at ?? DateTime(2026, 10, 14, 10),
+  dateTo: at ?? DateTime(2026, 10, 14, 10),
+  sourcePlatform: HealthPlatformType.googleHealthConnect,
+  sourceDeviceId: source,
+  sourceId: source,
+  sourceName: source,
+);
 HealthService service(
   FakeHealthSource source, {
   HealthProvider provider = HealthProvider.healthConnect,
@@ -195,7 +214,7 @@ void main() {
       expect(result.totalEnergy('Altă aplicație'), 300);
       expect(result.energySamples.length, 3);
       expect(result.workouts.length, 1);
-      expect(result.workouts.single.name, 'Antrenament de forță');
+      expect(result.workouts.single.name, 'Strength training');
       expect(result.updatedAt, healthNow);
     },
   );
@@ -221,7 +240,7 @@ void main() {
       expect(result.totalEnergy('Ceas'), isNull);
       expect(result.warnings, isNotEmpty);
       expect(source.stepCalls, 0);
-      expect(source.readCalls, 1);
+      expect(source.readCalls, 4);
     },
   );
 
@@ -271,7 +290,7 @@ void main() {
       await store.switchAccount('other-user');
       await tester.pumpAndSettle();
       expect(find.text('7000'), findsNothing);
-      expect(find.text('Conectează și alege accesul'), findsOneWidget);
+      expect(find.text('Connect and choose access'), findsOneWidget);
     },
   );
 
@@ -289,7 +308,157 @@ void main() {
       pending.complete(1000);
       await tester.pumpAndSettle();
       expect(find.text('7000'), findsNothing);
-      expect(find.text('Conectează și alege accesul'), findsOneWidget);
+      expect(find.text('Connect and choose access'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  test(
+    'body measurements normalize real units and heart rate keeps the actual latest timestamp/source',
+    () async {
+      final source = FakeHealthSource();
+      source.records[HealthDataType.WEIGHT] = [
+        numericHealth(
+          'weight',
+          HealthDataType.WEIGHT,
+          176.3698097,
+          HealthDataUnit.POUND,
+        ),
+      ];
+      source.records[HealthDataType.HEIGHT] = [
+        numericHealth(
+          'height',
+          HealthDataType.HEIGHT,
+          1.84,
+          HealthDataUnit.METER,
+        ),
+        numericHealth(
+          'bad',
+          HealthDataType.HEIGHT,
+          10,
+          HealthDataUnit.KILOGRAM,
+        ),
+      ];
+      source.records[HealthDataType.HEART_RATE] = [
+        numericHealth(
+          'old',
+          HealthDataType.HEART_RATE,
+          78,
+          HealthDataUnit.BEATS_PER_MINUTE,
+        ),
+        numericHealth(
+          'latest',
+          HealthDataType.HEART_RATE,
+          142,
+          HealthDataUnit.BEATS_PER_MINUTE,
+          at: DateTime(2026, 10, 15, 11, 59),
+          source: 'Actual chest strap',
+        ),
+        numericHealth(
+          'future',
+          HealthDataType.HEART_RATE,
+          150,
+          HealthDataUnit.BEATS_PER_MINUTE,
+          at: DateTime(2026, 10, 15, 13),
+        ),
+      ];
+      final result = await service(source).connect();
+      expect(result.bodyRecords.length, 2);
+      expect(
+        result.bodyRecords
+            .firstWhere((record) => record.kind == HealthBodyKind.height)
+            .value,
+        184,
+      );
+      expect(
+        result.bodyRecords
+            .firstWhere((record) => record.kind == HealthBodyKind.weight)
+            .value,
+        closeTo(80, .0001),
+      );
+      expect(result.latestHeartRate!.beatsPerMinute, 142);
+      expect(result.latestHeartRate!.sourceName, 'Actual chest strap');
+      expect(
+        result.latestHeartRate!.measuredAt,
+        DateTime(2026, 10, 15, 11, 59),
+      );
+      expect(result.bodyLookbackDays, 30);
+    },
+  );
+
+  testWidgets('Health body import saves only the explicitly selected record', (
+    tester,
+  ) async {
+    final source = FakeHealthSource();
+    source.records[HealthDataType.WEIGHT] = [
+      numericHealth(
+        'weight',
+        HealthDataType.WEIGHT,
+        80,
+        HealthDataUnit.KILOGRAM,
+      ),
+    ];
+    source.records[HealthDataType.HEIGHT] = [
+      numericHealth(
+        'height',
+        HealthDataType.HEIGHT,
+        1.84,
+        HealthDataUnit.METER,
+      ),
+    ];
+    final store = await healthStore();
+    await pumpHealth(tester, store, service(source));
+    await tester.ensureVisible(find.byKey(const ValueKey('health-connect')));
+    await tester.tap(find.byKey(const ValueKey('health-connect')));
+    await tester.pumpAndSettle();
+    expect(store.bodyMeasurements, isEmpty);
+    const id = 'health:healthConnect:Scale:weight:weight';
+    final button = find.byKey(const ValueKey('health-import-$id'));
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(find.text('Import weight?'), findsOneWidget);
+    expect(store.bodyMeasurements, isEmpty);
+    await tester.tap(find.widgetWithText(FilledButton, 'Import measurement'));
+    await tester.pumpAndSettle();
+    expect(store.bodyMeasurements.length, 1);
+    expect(store.bodyMeasurements.single.weightKg, 80);
+    expect(store.bodyMeasurements.single.heightCm, isNull);
+    expect(store.bodyMeasurements.single.sourceRecordId, id);
+    expect(store.profile.heightCm, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'changing account while a Health import confirmation is open prevents importing into the new account',
+    (tester) async {
+      final source = FakeHealthSource();
+      source.records[HealthDataType.WEIGHT] = [
+        numericHealth(
+          'weight',
+          HealthDataType.WEIGHT,
+          80,
+          HealthDataUnit.KILOGRAM,
+        ),
+      ];
+      final store = await healthStore();
+      await pumpHealth(tester, store, service(source));
+      await tester.ensureVisible(find.byKey(const ValueKey('health-connect')));
+      await tester.tap(find.byKey(const ValueKey('health-connect')));
+      await tester.pumpAndSettle();
+      final button = find.byKey(
+        const ValueKey(
+          'health-import-health:healthConnect:Scale:weight:weight',
+        ),
+      );
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      await store.switchAccount('different-user');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Import measurement'));
+      await tester.pumpAndSettle();
+      expect(store.bodyMeasurements, isEmpty);
+      expect(store.profile.weightKg, isNull);
       expect(tester.takeException(), isNull);
     },
   );

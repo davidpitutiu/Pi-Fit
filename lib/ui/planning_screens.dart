@@ -8,31 +8,32 @@ import '../services/notification_service.dart';
 import '../state/app_store.dart';
 import 'theme.dart';
 import 'health_screen.dart';
+import 'export_screen.dart';
 import 'training_screens.dart';
 
 const _months = [
-  'Ianuarie',
-  'Februarie',
-  'Martie',
-  'Aprilie',
-  'Mai',
-  'Iunie',
-  'Iulie',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
   'August',
-  'Septembrie',
-  'Octombrie',
-  'Noiembrie',
-  'Decembrie',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
-const _weekdays = ['Lu', 'Ma', 'Mi', 'Jo', 'Vi', 'Sâ', 'Du'];
+const _weekdays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 const _fullWeekdays = [
-  'Luni',
-  'Marți',
-  'Miercuri',
-  'Joi',
-  'Vineri',
-  'Sâmbătă',
-  'Duminică',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
 ];
 
 bool _sameDay(DateTime a, DateTime b) =>
@@ -78,12 +79,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
       }
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
+          settings: const RouteSettings(name: '/workout'),
           builder: (_) => ActiveWorkoutScreen(store: widget.store),
         ),
       );
     } catch (error) {
       if (mounted) {
-        toast(context, 'Antrenamentul nu a putut fi deschis: $error');
+        toast(context, 'Could not open the workout: $error');
       }
     }
   }
@@ -92,18 +94,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Ștergi programarea?'),
+        title: const Text('Delete this scheduled workout?'),
         content: Text(
-          '${widget.store.routineById(event.routineId)?.name ?? 'Antrenament'}\n${formatDate(event.date)} · ${formatTime(event.date)}',
+          '${widget.store.routineById(event.routineId)?.name ?? 'Workout'}\n${formatDate(event.date)} · ${formatTime(event.date)}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Păstrează'),
+            child: const Text('Keep'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Șterge'),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -114,11 +116,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       await widget.store.removeScheduled(event.id);
       if (mounted) {
-        toast(context, 'Programarea a fost ștearsă.');
+        toast(context, 'Scheduled workout deleted.');
       }
     } catch (error) {
       if (mounted) {
-        toast(context, 'Nu am putut finaliza ștergerea: $error');
+        toast(context, 'Could not delete the workout: $error');
       }
     }
   }
@@ -150,7 +152,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 _selected = DateTime.now();
                 _month = DateTime(_selected.year, _selected.month);
               }),
-              child: const Text('Astăzi'),
+              child: const Text('Today'),
             ),
             const SizedBox(width: 8),
           ],
@@ -158,14 +160,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
         body: PageBody(
           children: [
             Text(
-              'Fă loc progresului.',
+              'Make room for progress.',
               style: Theme.of(context).textTheme.headlineLarge,
             ),
             const SizedBox(height: 8),
             Text(
               upcoming == 0
-                  ? 'Un plan bun începe cu următorul antrenament.'
-                  : '$upcoming ${upcoming == 1 ? 'antrenament programat' : 'antrenamente programate'}. Ține-te de ritmul tău.',
+                  ? 'A good plan starts with your next workout.'
+                  : '$upcoming ${upcoming == 1 ? 'scheduled workout' : 'scheduled workouts'}. Keep your own rhythm.',
               style: TextStyle(color: PiColors.muted(context)),
             ),
             const SizedBox(height: 22),
@@ -174,7 +176,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: FilledButton.icon(
                 onPressed: _schedule,
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Programează antrenamente'),
+                label: const Text('Schedule workouts'),
               ),
             ),
             const SizedBox(height: 22),
@@ -185,7 +187,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   Row(
                     children: [
                       IconButton(
-                        tooltip: 'Luna precedentă',
+                        tooltip: 'Previous month',
                         onPressed: () => setState(
                           () =>
                               _month = DateTime(_month.year, _month.month - 1),
@@ -200,7 +202,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Luna următoare',
+                        tooltip: 'Next month',
                         onPressed: () => setState(
                           () =>
                               _month = DateTime(_month.year, _month.month + 1),
@@ -235,7 +237,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     children: [
                       const _LegendDot(color: PiColors.lime),
                       Text(
-                        'Programat',
+                        'Scheduled',
                         style: TextStyle(
                           fontSize: 11,
                           color: PiColors.muted(context),
@@ -246,7 +248,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       Text(
-                        'Finalizat',
+                        'Completed',
                         style: TextStyle(
                           fontSize: 11,
                           color: PiColors.muted(context),
@@ -264,10 +266,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
             if (events.isEmpty && completed.isEmpty)
               _PlanningEmpty(
                 icon: Icons.event_available_rounded,
-                title: 'Zi liberă în calendar',
-                subtitle:
-                    'Planifică o sesiune sau păstrează timp pentru recuperare.',
-                action: 'Adaugă o sesiune',
+                title: 'An open day',
+                subtitle: 'Plan a session or make time for recovery.',
+                action: 'Add a session',
                 onAction: _schedule,
               ),
             for (final event in events) ...[
@@ -312,7 +313,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               return Expanded(
                 child: Semantics(
                   label:
-                      '${formatDate(date)}${planned ? ', antrenament programat' : ''}${done ? ', antrenament finalizat' : ''}',
+                      '${formatDate(date)}${planned ? ', scheduled workout' : ''}${done ? ', completed workout' : ''}',
                   selected: selected,
                   button: true,
                   child: InkWell(
@@ -423,14 +424,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      routine?.name ?? 'Rutină indisponibilă',
+                      routine?.name ?? 'Routine unavailable',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 3),
                     Text(
                       routine == null
-                          ? 'Rutina originală nu mai există.'
-                          : '${routine.exercises.length} exerciții · ~${routine.estimatedMinutes} min',
+                          ? 'The original routine is no longer available.'
+                          : '${routine.exercises.length} exercises · ~${routine.estimatedMinutes} min',
                       style: TextStyle(
                         color: PiColors.muted(context),
                         fontSize: 12,
@@ -440,7 +441,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ),
               IconButton(
-                tooltip: 'Șterge programarea',
+                tooltip: 'Delete scheduled workout',
                 onPressed: () => _remove(event),
                 icon: const Icon(Icons.more_horiz_rounded),
               ),
@@ -460,8 +461,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               Expanded(
                 child: Text(
                   event.reminder
-                      ? 'Reminder solicitat · verifică permisiunile'
-                      : (past ? 'Sesiune planificată' : 'În calendar'),
+                      ? 'Reminder requested · check permissions'
+                      : (past ? 'Scheduled session' : 'In your calendar'),
                   style: TextStyle(
                     fontSize: 11,
                     color: PiColors.muted(context),
@@ -476,7 +477,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 child: Text(
-                  widget.store.activeSession == null ? 'Începe' : 'Continuă',
+                  widget.store.activeSession == null ? 'Start' : 'Continue',
                 ),
               ),
             ],
@@ -572,7 +573,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
       initialDate: _start,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: DateTime(math.max(now.year, _start.year) + 3, 12, 31),
-      helpText: 'Prima zi din plan',
+      helpText: 'First day of your plan',
     );
     if (chosen != null && mounted) {
       setState(() => _start = chosen);
@@ -583,7 +584,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
     final chosen = await showTimePicker(
       context: context,
       initialTime: _time,
-      helpText: 'Ora antrenamentelor',
+      helpText: 'Workout time',
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
         child: child!,
@@ -617,20 +618,22 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
       }
       Navigator.pop(
         context,
-        '$added ${added == 1 ? 'antrenament salvat' : 'antrenamente salvate'} în calendar.${_reminder && added > 0 ? ' Remindere programate pe acest dispozitiv.' : ''}',
+        '$added ${added == 1 ? 'saved workout' : 'saved workouts'} in your calendar.${_reminder && added > 0 ? ' Reminders scheduled on this device.' : ''}',
       );
     } catch (error) {
       final added = widget.store.schedule
           .where((event) => !before.contains(event.id))
           .length;
-      final storageFailure = error.toString().contains('Salvarea locală');
+      final storageFailure =
+          (error.toString().contains('Salvarea locală') ||
+          error.toString().contains('Local save'));
       if (!mounted) {
         return;
       }
       if (added > 0 && !storageFailure) {
         Navigator.pop(
           context,
-          '$added ${added == 1 ? 'antrenament salvat' : 'antrenamente salvate'} în calendar. Reminderele nu au putut fi programate complet: ${_errorText(error)}',
+          '$added ${added == 1 ? 'saved workout' : 'saved workouts'} in your calendar. Some reminders could not be scheduled: ${_errorText(error)}',
         );
       } else {
         setState(() {
@@ -666,12 +669,12 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Planul tău, ritmul tău.',
+              'Your plan. Your pace.',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              'O sesiune sau o rutină pentru următoarele săptămâni.',
+              'One session or a routine for the weeks ahead.',
               style: TextStyle(color: PiColors.muted(context)),
             ),
             const SizedBox(height: 22),
@@ -679,8 +682,8 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
               width: double.infinity,
               child: SegmentedButton<bool>(
                 segments: const [
-                  ButtonSegment(value: false, label: Text('O sesiune')),
-                  ButtonSegment(value: true, label: Text('În serie')),
+                  ButtonSegment(value: false, label: Text('One session')),
+                  ButtonSegment(value: true, label: Text('Repeat')),
                 ],
                 selected: {_bulk},
                 onSelectionChanged: _saving
@@ -693,9 +696,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
               DropdownButtonFormField<String>(
                 initialValue: _routineId,
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Rutina de antrenament',
-                ),
+                decoration: const InputDecoration(labelText: 'Workout routine'),
                 items: widget.store.routines
                     .map(
                       (routine) => DropdownMenuItem(
@@ -712,7 +713,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                     : (value) => setState(() => _routineId = value),
               )
             else
-              const Text('Creează întâi o rutină din fila Antrenament.'),
+              const Text('First create a routine in the Train tab.'),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -744,7 +745,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
             if (_bulk) ...[
               const SizedBox(height: 20),
               Text(
-                'Zilele în care te antrenezi',
+                'Your training days',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 10),
@@ -772,7 +773,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Durata planului',
+                      'Plan length',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
@@ -784,7 +785,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                       (index) => DropdownMenuItem(
                         value: index + 1,
                         child: Text(
-                          '${index + 1} ${index == 0 ? 'săptămână' : 'săptămâni'}',
+                          '${index + 1} ${index == 0 ? 'week' : 'weeks'}',
                         ),
                       ),
                     ),
@@ -800,13 +801,13 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
               contentPadding: EdgeInsets.zero,
               value: _reminder,
               title: const Text(
-                'Reminder la ora antrenamentului',
+                'Remind me at workout time',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               ),
               subtitle: Text(
                 supported
-                    ? 'Permisiunea se solicită când salvezi planul.'
-                    : 'Disponibil în aplicația instalată pe Android și iOS.',
+                    ? 'Permission is requested when you save this plan.'
+                    : 'Available in the installed Android and iOS app.',
                 style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
               ),
               onChanged: !supported || _saving
@@ -830,14 +831,14 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${dates.length} ${dates.length == 1 ? 'sesiune nouă' : 'sesiuni noi'}',
+                          '${dates.length} ${dates.length == 1 ? 'new session' : 'new sessions'}',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           dates.isEmpty
-                              ? 'Alege o dată viitoare și cel puțin o zi. Programările identice sunt omise.'
-                              : '${formatDate(dates.first)}${dates.length > 1 ? ' — ${formatDate(dates.last)}' : ''}\nProgramările identice și orele trecute sunt omise.',
+                              ? 'Choose a future date and at least one day. Duplicate sessions are skipped.'
+                              : '${formatDate(dates.first)}${dates.length > 1 ? ' — ${formatDate(dates.last)}' : ''}\nDuplicate sessions and past times are skipped.',
                           style: TextStyle(
                             color: PiColors.muted(context),
                             fontSize: 12,
@@ -871,8 +872,8 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                     : const Icon(Icons.check_rounded),
                 label: Text(
                   _saving
-                      ? 'Se salvează…'
-                      : 'Adaugă ${dates.length} ${dates.length == 1 ? 'sesiune' : 'sesiuni'}',
+                      ? 'Saving…'
+                      : 'Add ${dates.length} ${dates.length == 1 ? 'session' : 'sessions'}',
                 ),
               ),
             ),
@@ -904,6 +905,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     listenable: store,
     builder: (context, _) {
       final analytics = store.analytics;
+      final allTimeCount = completedTrainingSessions(
+        store.history,
+        now: analytics.asOf,
+      ).length;
       final series = buildTrainingSeries(
         history: store.history,
         exercises: store.exercises,
@@ -927,23 +932,30 @@ class _ProgressScreenState extends State<ProgressScreen> {
               now: analytics.asOf,
             );
       final history = [
-        ...store.history.where(
-          (session) =>
-              session.finishedAt != null &&
-              !session.finishedAt!.isAfter(analytics.asOf),
-        ),
+        ...completedTrainingSessions(store.history, now: analytics.asOf),
       ]..sort((a, b) => b.startedAt.compareTo(a.startedAt));
       return Scaffold(
         appBar: AppBar(
           title: const Text(
-            'Progres',
+            'Progress',
             style: TextStyle(fontWeight: FontWeight.w800),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'Export progress',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ExportScreen(store: store),
+                ),
+              ),
+              icon: const Icon(Icons.ios_share_rounded),
+            ),
+          ],
         ),
         body: PageBody(
           children: [
             Text(
-              'PROGRESUL TĂU',
+              'YOUR PROGRESS',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
@@ -953,15 +965,47 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Mai bine, în ritmul tău.',
+              'Better, at your own pace.',
               style: Theme.of(context).textTheme.headlineLarge,
             ),
             const SizedBox(height: 10),
             Text(
-              'Date reale. Obiective personale. Fiecare pas este vizibil.',
+              'Real numbers. Personal goals. Every step, visible.',
               style: TextStyle(color: PiColors.muted(context)),
             ),
             const SizedBox(height: 24),
+            PiCard(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.fitness_center_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$allTimeCount completed ${allTimeCount == 1 ? 'workout' : 'workouts'}',
+                          key: const ValueKey('all-time-workout-count'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Text(
+                          'All time · every completed session counts once',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: PiColors.muted(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
             _ConsistencyCard(analytics: analytics),
             const SizedBox(height: 14),
             _StreakCard(
@@ -976,7 +1020,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 for (final days in [7, 28, 90])
                   ChoiceChip(
                     key: ValueKey('period-$days'),
-                    label: Text('$days zile'),
+                    label: Text('$days days'),
                     selected: _days == days,
                     showCheckmark: false,
                     onSelected: (_) => setState(() => _days = days),
@@ -988,19 +1032,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    'Ultimele $_days de zile',
+                    'Your last $_days days',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Cum se calculează statisticile',
+                  tooltip: 'How your statistics work',
                   onPressed: () => _showExplanation(
                     context,
-                    'Despre statisticile tale',
+                    'About your statistics',
                     [
-                      'Intervalul selectat include ultimele $_days zile calendaristice, inclusiv azi. Sunt folosite numai sesiunile finalizate cu seturi bifate valide.',
+                      'The selected period includes the last $_days calendar days, including today. Only completed sessions with valid checked sets are included.',
                       analytics.volumeExplanation,
-                      'Minutele reprezintă durata înregistrată între pornirea și finalizarea sesiunii, inclusiv pauzele.',
+                      'Minutes are the logged time between starting and finishing a session, including rests.',
                     ],
                   ),
                   icon: Icon(
@@ -1026,44 +1070,44 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     _StatCard(
                       width: width,
                       value: '${series.workoutCount}',
-                      label: 'antrenamente salvate',
+                      label: 'saved workouts',
                       icon: Icons.fitness_center_rounded,
                     ),
                     _StatCard(
                       width: width,
                       value: '${series.completedSets}',
-                      label: 'seturi completate',
+                      label: 'completed sets',
                       icon: Icons.check_circle_outline_rounded,
                     ),
                     _StatCard(
                       width: width,
                       value: _volume(series.volume),
-                      label: 'kg · volum extern',
+                      label: 'kg · external volume',
                       icon: Icons.monitor_weight_outlined,
                     ),
                     _StatCard(
                       width: width,
                       value: '${series.activeDays}',
-                      label: 'zile active',
+                      label: 'active days',
                       icon: Icons.calendar_today_rounded,
                     ),
                   ],
                 );
               },
             ),
-            const SectionHeading(title: 'Evoluția antrenamentelor'),
+            const SectionHeading(title: 'Training over time'),
             _TrainingTrendCard(
               series: series,
               metric: _metric,
               onMetric: (metric) => setState(() => _metric = metric),
             ),
-            const SectionHeading(title: 'Mai puternic, pas cu pas'),
+            const SectionHeading(title: 'Stronger, session by session'),
             if (records.isEmpty)
               const _PlanningEmpty(
                 icon: Icons.show_chart_rounded,
-                title: 'Primul punct de progres te așteaptă',
+                title: 'Your first progress point is ahead',
                 subtitle:
-                    'Salvează seturi de forță cu greutate externă. Vei putea urmări greutatea și estimarea 1RM pentru fiecare exercițiu.',
+                    'Save weighted strength sets to track the weight and estimated 1RM for each exercise.',
               )
             else
               PiCard(
@@ -1074,7 +1118,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       key: const ValueKey('progress-exercise'),
                       initialValue: selectedId,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Exercițiu'),
+                      decoration: const InputDecoration(labelText: 'Exercise'),
                       items: [
                         for (final record in records)
                           DropdownMenuItem(
@@ -1094,14 +1138,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       runSpacing: 8,
                       children: [
                         ChoiceChip(
-                          label: const Text('Greutate'),
+                          label: const Text('Weight'),
                           selected: !_showEstimatedMax,
                           showCheckmark: false,
                           onSelected: (_) =>
                               setState(() => _showEstimatedMax = false),
                         ),
                         ChoiceChip(
-                          label: const Text('1RM estimat'),
+                          label: const Text('Estimated 1RM'),
                           selected: _showEstimatedMax,
                           showCheckmark: false,
                           onSelected: (_) =>
@@ -1119,7 +1163,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ],
                 ),
               ),
-            const SectionHeading(title: 'În afara sălii'),
+            const SectionHeading(title: 'Beyond the gym'),
             PiCard(
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -1139,11 +1183,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Sănătate & mișcare',
+                          'Health & movement',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(
-                          'Pași, energie și minute de mișcare',
+                          'Steps, energy and movement minutes',
                           style: TextStyle(
                             fontSize: 12,
                             color: PiColors.muted(context),
@@ -1156,35 +1200,35 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 ],
               ),
             ),
-            const SectionHeading(title: 'Unde ai lucrat'),
+            const SectionHeading(title: 'Where you put in the work'),
             if (series.muscles.isEmpty)
               _PlanningEmpty(
                 icon: Icons.accessibility_new_rounded,
-                title: 'Harta ta musculară prinde contur',
+                title: 'Your muscle map is taking shape',
                 subtitle:
-                    'Seturile bifate din ultimele $_days de zile apar aici, grupate după mușchiul principal.',
+                    'Checked sets from the last $_days days appear here, grouped by the primary muscle.',
               )
             else
               _MuscleDistribution(muscles: series.muscles, days: _days),
             SectionHeading(
-              title: 'Recorduri personale',
-              action: 'Despre 1RM',
+              title: 'Personal records',
+              action: 'About 1RM',
               onAction: () => _showExplanation(
                 context,
-                'Recorduri și estimări',
+                'Records and estimates',
                 [analytics.recordsExplanation],
               ),
             ),
             if (analytics.records.isEmpty)
               const _PlanningEmpty(
                 icon: Icons.emoji_events_outlined,
-                title: 'Primul record te așteaptă',
+                title: 'Your first record is ahead',
                 subtitle:
-                    'Salvează un set cu greutate externă. Aici vei vedea cel mai bun set și, când este posibil, estimarea 1RM.',
+                    'Save a weighted strength set to see your best set and, where eligible, an estimated 1RM.',
               )
             else ...[
               Text(
-                'Tot istoricul · seturi de forță cu greutate externă',
+                'All time · weighted strength sets',
                 style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
               ),
               const SizedBox(height: 12),
@@ -1208,8 +1252,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
             ],
             SectionHeading(
-              title: 'Jurnalul tău',
-              action: history.isEmpty ? null : '${history.length} sesiuni',
+              title: 'Your training log',
+              action: history.isEmpty ? null : '${history.length} sessions',
               onAction: history.isEmpty
                   ? null
                   : () => _openHistory(context, store, history),
@@ -1217,10 +1261,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
             if (history.isEmpty)
               _PlanningEmpty(
                 icon: Icons.history_rounded,
-                title: 'Înregistrează primul antrenament',
+                title: 'Log your first workout',
                 subtitle:
-                    'Alege o rutină, bifează seturile efectuate și salvează. Statisticile se construiesc din antrenamentele tale.',
-                action: 'Alege un antrenament',
+                    'Choose a routine, check off the sets you complete, then save. Your workouts build your statistics.',
+                action: 'Choose a workout',
                 onAction: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => RoutinesScreen(store: store),
@@ -1236,7 +1280,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () => _openHistory(context, store, history),
-                  child: Text('Vezi toate cele ${history.length} sesiuni'),
+                  child: Text('View all ${history.length} sessions'),
                 ),
               ),
           ],
@@ -1253,7 +1297,7 @@ void _openHistory(
 ) => Navigator.of(context).push(
   MaterialPageRoute<void>(
     builder: (context) => Scaffold(
-      appBar: AppBar(title: const Text('Jurnal de antrenament')),
+      appBar: AppBar(title: const Text('Workout history')),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(22, 16, 22, 32),
         itemCount: history.length,
@@ -1289,17 +1333,17 @@ Future<void> _showExplanation(
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Am înțeles'),
+        child: const Text('Got it'),
       ),
     ],
   ),
 );
 
 enum _TrendMetric {
-  volume('Volum', 'kg'),
-  sets('Seturi', 'seturi'),
-  sessions('Sesiuni', 'sesiuni'),
-  minutes('Minute', 'min');
+  volume('Volume', 'kg'),
+  sets('Sets', 'sets'),
+  sessions('Sessions', 'sessions'),
+  minutes('Minutes', 'min');
 
   const _TrendMetric(this.label, this.unit);
   final String label;
@@ -1423,14 +1467,14 @@ class _TrainingTrendCardState extends State<_TrainingTrendCard> {
           ),
           const SizedBox(height: 4),
           Text(
-            'în ultimele ${widget.series.days} zile',
+            'over the last ${widget.series.days} days',
             style: TextStyle(color: PiColors.muted(context), fontSize: 12),
           ),
           if (widget.series.workoutCount == 0) ...[
             const SizedBox(height: 28),
             const _ChartEmpty(
               message:
-                  'Nicio sesiune finalizată în acest interval. Următorul antrenament va deveni primul punct de pe grafic.',
+                  'No completed sessions in this period. Your next workout will become the first point on your chart.',
             ),
           ] else ...[
             const SizedBox(height: 24),
@@ -1545,8 +1589,8 @@ class _TrainingTrendCardState extends State<_TrainingTrendCard> {
               ),
             Text(
               binSize == 1
-                  ? 'Fiecare bară reprezintă o zi.'
-                  : 'Bare de câte 7 zile; ultima poate fi un interval mai scurt.',
+                  ? 'Each bar represents one day.'
+                  : 'Each bar covers 7 days; the last interval may be shorter.',
               style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
             ),
             Align(
@@ -1564,7 +1608,7 @@ class _TrainingTrendCardState extends State<_TrainingTrendCard> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(22, 0, 22, 14),
                           child: Text(
-                            '${widget.metric.label} · valorile graficului',
+                            '${widget.metric.label} · chart values',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ),
@@ -1590,13 +1634,13 @@ class _TrainingTrendCardState extends State<_TrainingTrendCard> {
                   ),
                 ),
                 icon: const Icon(Icons.table_rows_outlined, size: 17),
-                label: const Text('Vezi valorile'),
+                label: const Text('View values'),
               ),
             ),
           ],
           if (widget.metric == _TrendMetric.minutes)
             Text(
-              'Durata înregistrată a sesiunilor, inclusiv pauzele.',
+              'Logged session duration, including rests.',
               style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
             ),
         ],
@@ -1641,9 +1685,9 @@ class _StreakCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PiCard(
-    onTap: () => _showExplanation(context, 'Cum funcționează seria', [
+    onTap: () => _showExplanation(context, 'How your streak works', [
       streak.explanation,
-      'Obiectivul curent: ${streak.targetDaysPerWeek} zile active pe săptămână. Îl poți modifica din Cont → Profil.',
+      'Current goal: ${streak.targetDaysPerWeek} active days per week. Change it in Account → Profile.',
     ]),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1657,7 +1701,7 @@ class _StreakCard extends StatelessWidget {
             const SizedBox(width: 9),
             Expanded(
               child: Text(
-                'Revii. Construiești. Repeți.',
+                'Show up. Build. Repeat.',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
@@ -1676,21 +1720,21 @@ class _StreakCard extends StatelessWidget {
             Expanded(
               child: _StreakMetric(
                 value: streak.currentWeeks,
-                label: 'săptămâni la rând',
+                label: 'weeks in a row',
               ),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: _StreakMetric(
                 value: streak.bestWeeks,
-                label: 'cea mai bună serie',
+                label: 'best streak',
               ),
             ),
           ],
         ),
         const SizedBox(height: 20),
         Text(
-          'Săptămâna aceasta · ${streak.activeDaysThisWeek} / ${streak.targetDaysPerWeek} zile',
+          'This week · ${streak.activeDaysThisWeek} / ${streak.targetDaysPerWeek} days',
           style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
         ),
         const SizedBox(height: 12),
@@ -1710,7 +1754,7 @@ class _StreakCard extends StatelessWidget {
                     );
                     return Semantics(
                       label:
-                          '${_fullWeekdays[index]}, ${formatDate(day)}: ${active ? 'antrenament înregistrat' : 'fără antrenament înregistrat'}',
+                          '${_fullWeekdays[index]}, ${formatDate(day)}: ${active ? 'logged workout' : 'no logged workout'}',
                       child: Column(
                         children: [
                           Container(
@@ -1830,15 +1874,15 @@ class _ExerciseProgressChartState extends State<_ExerciseProgressChart> {
             point.date,
             widget.estimated ? point.estimatedOneRepMax! : point.topWeight,
             widget.estimated
-                ? '1RM estimat'
+                ? 'Estimated 1RM'
                 : '${_number(point.topWeight)} kg × ${point.topWeightReps}',
           ),
     ];
     if (points.isEmpty) {
       return _ChartEmpty(
         message: widget.estimated
-            ? 'Nu există seturi eligibile de 1–12 repetări în acest interval. Alege Greutate sau o perioadă mai lungă.'
-            : 'Niciun set pentru acest exercițiu în intervalul selectat. Alege alt exercițiu sau o perioadă mai lungă.',
+            ? 'No eligible sets with 1–12 reps in this period. Choose Weight or a longer period.'
+            : 'No sets for this exercise in the selected period. Choose another exercise or a longer period.',
       );
     }
     final selected = (_selected ?? points.length - 1).clamp(
@@ -1860,7 +1904,7 @@ class _ExerciseProgressChartState extends State<_ExerciseProgressChart> {
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             Text(
-              widget.estimated ? '1RM estimat' : 'greutate externă',
+              widget.estimated ? 'Estimated 1RM' : 'external weight',
               style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
             ),
           ],
@@ -1874,7 +1918,7 @@ class _ExerciseProgressChartState extends State<_ExerciseProgressChart> {
         const SizedBox(height: 22),
         Semantics(
           label:
-              'Grafic cu ${points.length} zile înregistrate. ${points.map((point) => '${formatDate(point.date)}: ${_number(point.value)} kg').join('; ')}',
+              'Chart with ${points.length} logged days. ${points.map((point) => '${formatDate(point.date)}: ${_number(point.value)} kg').join('; ')}',
           child: SizedBox(
             height: 150,
             width: double.infinity,
@@ -1918,26 +1962,26 @@ class _ExerciseProgressChartState extends State<_ExerciseProgressChart> {
             onChanged: (value) => setState(() => _selected = value.round()),
           ),
           Text(
-            '${delta > 0 ? '+' : ''}${_number(delta)} kg între prima și ultima zi înregistrată din interval.',
+            '${delta > 0 ? '+' : ''}${_number(delta)} kg between the first and last logged day in this period.',
             style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
           ),
         ] else ...[
           const SizedBox(height: 14),
           Text(
-            'O zi înregistrată. Următoarea sesiune va arăta o evoluție.',
+            'One logged day. Another session will show a trend.',
             style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
           ),
         ],
         const SizedBox(height: 12),
         Text(
           widget.estimated
-              ? 'Epley, numai seturi de 1–12 repetări. Estimarea nu este o greutate recomandată.'
-              : 'Cel mai greu set bifat din fiecare zi. Repetările pot fi diferite.',
+              ? 'Epley, using sets of 1–12 reps only. The estimate is not a recommended weight.'
+              : 'The heaviest checked set each day. Reps may differ.',
           style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
         ),
         const SizedBox(height: 6),
         Text(
-          'Punctele sunt zile înregistrate; zilele fără date nu sunt completate cu valori inventate.',
+          'Points represent logged days; missing days are left without invented values.',
           style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
         ),
       ],
@@ -2076,7 +2120,7 @@ class _ConsistencyCard extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Scor de consecvență',
+                'Consistency score',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
@@ -2096,15 +2140,15 @@ class _ConsistencyCard extends StatelessWidget {
               children: [
                 Text(
                   analytics.score == null
-                      ? 'Aici începe ritmul tău.'
-                      : '${analytics.activeDaysLast28} / ${analytics.targetDaysLast28} zile active',
+                      ? 'Your rhythm starts here.'
+                      : '${analytics.activeDaysLast28} / ${analytics.targetDaysLast28} active days',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   analytics.score == null
-                      ? 'Scorul apare după primul antrenament salvat cu seturi bifate.'
-                      : 'Obiectivul tău: ${analytics.targetSessionsPerWeek} zile de antrenament pe săptămână.',
+                      ? 'Your score appears after the first saved workout with checked sets.'
+                      : 'Your goal: ${analytics.targetSessionsPerWeek} training days per week.',
                   style: TextStyle(
                     color: PiColors.muted(context),
                     fontSize: 12,
@@ -2113,7 +2157,7 @@ class _ConsistencyCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Vezi calculul complet',
+                  'See the calculation',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -2145,7 +2189,7 @@ class _ConsistencyCard extends StatelessWidget {
         Divider(height: 1, color: Theme.of(context).dividerColor),
         const SizedBox(height: 14),
         Text(
-          'Consecvență față de obiectivul tău, în ultimele 28 de zile.',
+          'Consistency against your goal, over the last 28 days.',
           style: TextStyle(color: PiColors.muted(context), fontSize: 11),
         ),
       ],
@@ -2160,8 +2204,8 @@ class _ScoreRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     label: score == null
-        ? 'Scor indisponibil. Înregistrează primul antrenament.'
-        : 'Scor de consecvență ${score!.round()} din 100.',
+        ? 'Score unavailable. Log your first workout.'
+        : 'Consistency score ${score!.round()} out of 100.',
     child: SizedBox(
       width: 136,
       height: 136,
@@ -2197,7 +2241,7 @@ class _ScoreRing extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  score == null ? 'fără date' : 'din 100',
+                  score == null ? 'no data' : 'out of 100',
                   style: TextStyle(
                     color: PiColors.muted(context),
                     fontSize: 11,
@@ -2218,7 +2262,7 @@ Future<void> _showScoreDetails(
 ) => showDialog<void>(
   context: context,
   builder: (context) => AlertDialog(
-    title: const Text('Cum se calculează scorul'),
+    title: const Text('How your score is calculated'),
     content: SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2233,7 +2277,7 @@ Future<void> _showScoreDetails(
             ),
             const SizedBox(height: 5),
             Text(
-              '${component.value} / ${component.target} · ${_number(component.points)} din ${_number(component.maxPoints)} puncte',
+              '${component.value} / ${component.target} · ${_number(component.points)} of ${_number(component.maxPoints)} points',
               key: ValueKey('score-component-${component.maxPoints.toInt()}'),
             ),
             const SizedBox(height: 5),
@@ -2253,7 +2297,7 @@ Future<void> _showScoreDetails(
           if (analytics.score == null) ...[
             const SizedBox(height: 14),
             const Text(
-              'Nu există încă date pentru un scor. Salvează primul antrenament cu cel puțin un set bifat.',
+              'No data for a score yet. Save your first workout with at least one checked set.',
             ),
           ],
         ],
@@ -2262,7 +2306,7 @@ Future<void> _showScoreDetails(
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Am înțeles'),
+        child: const Text('Got it'),
       ),
     ],
   ),
@@ -2330,12 +2374,12 @@ class _MuscleDistribution extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Seturi pe grupa principală',
+            'Sets by primary muscle',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 6),
           Text(
-            'Ultimele $days de zile · fără dublarea grupelor secundare',
+            'Last $days days · secondary muscles are not counted twice',
             style: TextStyle(color: PiColors.muted(context), fontSize: 11),
           ),
           const SizedBox(height: 20),
@@ -2359,7 +2403,7 @@ class _MuscleDistribution extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '${muscle.completedSets} ${muscle.completedSets == 1 ? 'set' : 'seturi'}',
+                        '${muscle.completedSets} ${muscle.completedSets == 1 ? 'set' : 'sets'}',
                         style: TextStyle(
                           color: PiColors.muted(context),
                           fontSize: 12,
@@ -2397,7 +2441,7 @@ class _MuscleDistribution extends StatelessWidget {
                   ),
                 ),
               ),
-              child: Text('Vezi toate cele ${muscles.length} grupe'),
+              child: Text('View all ${muscles.length} groups'),
             ),
         ],
       ),
@@ -2443,7 +2487,7 @@ class _RecordRow extends StatelessWidget {
             ),
             if (record.estimatedOneRepMax != null)
               Text(
-                '1RM estimat · ${_number(record.estimatedOneRepMax!)} kg',
+                'Estimated 1RM · ${_number(record.estimatedOneRepMax!)} kg',
                 style: TextStyle(color: PiColors.muted(context), fontSize: 12),
               ),
           ],
@@ -2464,7 +2508,7 @@ String _exerciseName(AppStore store, String id) {
       return exercise.name;
     }
   }
-  return 'Exercițiu salvat';
+  return 'Saved exercise';
 }
 
 class _HistoryCard extends StatelessWidget {
@@ -2524,11 +2568,11 @@ class _HistoryCard extends StatelessWidget {
                     _InlineMetric(
                       icon: Icons.check_rounded,
                       label:
-                          '${metrics.completedSetsLast28} / ${session.totalSets} seturi',
+                          '${metrics.completedSetsLast28} / ${session.totalSets} sets',
                     ),
                     _InlineMetric(
                       icon: Icons.fitness_center_rounded,
-                      label: '${_volume(metrics.volumeLast28)} kg extern',
+                      label: '${_volume(metrics.volumeLast28)} kg external',
                     ),
                   ],
                 ),
@@ -2614,17 +2658,18 @@ class _SessionDetails extends StatelessWidget {
                 _InlineMetric(
                   icon: Icons.check_circle_outline_rounded,
                   label:
-                      '${metrics.completedSetsLast28} / ${session.totalSets} seturi',
+                      '${metrics.completedSetsLast28} / ${session.totalSets} sets',
                 ),
                 _InlineMetric(
                   icon: Icons.fitness_center_rounded,
-                  label: '${_volume(metrics.volumeLast28)} kg volum extern',
+                  label:
+                      '${_volume(metrics.volumeLast28)} kg externalal volume',
                 ),
               ],
             ),
             const SizedBox(height: 16),
             Text(
-              'Statisticile folosesc seturile bifate cu valori valide. Seturile nebifate arată ce era planificat.',
+              'Statistics use checked sets with valid values. Unchecked sets show what was planned.',
               style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
             ),
             const SizedBox(height: 20),
@@ -2653,7 +2698,7 @@ class _SessionDetails extends StatelessWidget {
                         ),
                         Expanded(
                           child: Text(
-                            'GREUTATE × REP',
+                            'WEIGHT × REPS',
                             style: TextStyle(
                               fontSize: 10,
                               color: PiColors.muted(context),
@@ -2686,7 +2731,7 @@ class _SessionDetails extends StatelessWidget {
                             ),
                             Expanded(
                               child: Text(
-                                '${exercise.sets[index].weight == 0 ? 'Corp' : '${_number(exercise.sets[index].weight)} kg'} × ${exercise.sets[index].reps}',
+                                '${exercise.sets[index].weight == 0 ? 'Bodyweight' : '${_number(exercise.sets[index].weight)} kg'} × ${exercise.sets[index].reps}',
                                 style: TextStyle(
                                   fontWeight: exercise.sets[index].completed
                                       ? FontWeight.w700
@@ -2699,15 +2744,15 @@ class _SessionDetails extends StatelessWidget {
                             ),
                             Tooltip(
                               message: exercise.sets[index].completed
-                                  ? 'Set completat'
-                                  : 'Set planificat, neefectuat',
+                                  ? 'Completed set'
+                                  : 'Planned set, not completed',
                               child: Icon(
                                 exercise.sets[index].completed
                                     ? Icons.check_circle_rounded
                                     : Icons.remove_circle_outline_rounded,
                                 semanticLabel: exercise.sets[index].completed
-                                    ? 'Completat'
-                                    : 'Planificat, neefectuat',
+                                    ? 'Completed'
+                                    : 'Planned, not completed',
                                 color: exercise.sets[index].completed
                                     ? Theme.of(context).colorScheme.primary
                                     : PiColors.muted(context),
@@ -2722,7 +2767,7 @@ class _SessionDetails extends StatelessWidget {
                       const Divider(),
                       const SizedBox(height: 8),
                       Text(
-                        '1RM estimat · ${_number(estimates[exercise.exerciseId]!)} kg',
+                        'Estimated 1RM · ${_number(estimates[exercise.exerciseId]!)} kg',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -2731,7 +2776,7 @@ class _SessionDetails extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Epley · din cel mai bun set bifat eligibil (1–12 repetări).',
+                        'Epley · from the best eligible checked set (1–12 reps).',
                         style: TextStyle(
                           fontSize: 11,
                           color: PiColors.muted(context),
@@ -2744,7 +2789,7 @@ class _SessionDetails extends StatelessWidget {
               const SizedBox(height: 12),
             ],
             if (session.notes.trim().isNotEmpty) ...[
-              const SectionHeading(title: 'Notițele tale'),
+              const SectionHeading(title: 'Your notes'),
               PiCard(
                 child: SizedBox(
                   width: double.infinity,
@@ -2757,7 +2802,7 @@ class _SessionDetails extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Închide'),
+                child: const Text('Close'),
               ),
             ),
           ],

@@ -36,13 +36,11 @@ void main() {
     await pumpPhone(tester, AuthScreen(store: store));
     expect(find.byKey(const Key('auth-email')), findsOneWidget);
     expect(find.byKey(const Key('auth-password')), findsOneWidget);
-    await tester.ensureVisible(
-      find.widgetWithText(FilledButton, 'Conectează-te'),
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Conectează-te'));
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pumpAndSettle();
-    expect(find.text('Introdu o adresă de email validă.'), findsOneWidget);
-    expect(find.text('Introdu parola.'), findsOneWidget);
+    expect(find.text('Enter a valid email address.'), findsOneWidget);
+    expect(find.text('Enter your password.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -61,16 +59,16 @@ void main() {
       'different',
     );
     await tester.ensureVisible(
-      find.widgetWithText(FilledButton, 'Creează cont'),
+      find.widgetWithText(FilledButton, 'Create account'),
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Creează cont'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
     await tester.pumpAndSettle();
-    expect(find.text('Introdu numele tău.'), findsOneWidget);
+    expect(find.text('Enter your name.'), findsOneWidget);
     expect(
-      find.text('Parola trebuie să aibă cel puțin 8 caractere.'),
+      find.text('Your password must contain at least 8 characters.'),
       findsOneWidget,
     );
-    expect(find.text('Parolele trebuie să coincidă.'), findsOneWidget);
+    expect(find.text('Passwords must match.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -87,13 +85,11 @@ void main() {
         find.byKey(const Key('auth-password')),
         '12345678',
       );
-      await tester.ensureVisible(
-        find.widgetWithText(FilledButton, 'Conectează-te'),
-      );
-      await tester.tap(find.widgetWithText(FilledButton, 'Conectează-te'));
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Sign in'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('auth-error')), findsOneWidget);
-      expect(find.textContaining('Configurația este inclusă'), findsOneWidget);
+      expect(find.textContaining('Configuration is included'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -103,10 +99,10 @@ void main() {
     (tester) async {
       final store = await newStore();
       await pumpPhone(tester, AccountScreen(store: store, embedded: true));
-      expect(find.text('Conectează-te'), findsOneWidget);
-      expect(find.text('Creează un cont'), findsOneWidget);
-      await tester.ensureVisible(find.text('Creează un cont'));
-      await tester.tap(find.text('Creează un cont'));
+      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.text('Create an account'), findsOneWidget);
+      await tester.ensureVisible(find.text('Create an account'));
+      await tester.tap(find.text('Create an account'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('auth-confirmation')), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -118,9 +114,12 @@ void main() {
   ) async {
     final store = await newStore();
     await pumpPhone(tester, AccountScreen(store: store, embedded: true));
-    final healthEntry = find.text('Activitate și sănătate');
+    final healthEntry = find.text('Health and activity');
     expect(healthEntry.hitTestable(), findsOneWidget);
-    expect(find.text('Citire locală · doar cu permisiunea ta'), findsOneWidget);
+    expect(
+      find.text('Local access · only with your permission'),
+      findsOneWidget,
+    );
     await tester.tap(healthEntry);
     await tester.pumpAndSettle();
     expect(find.byType(HealthScreen), findsOneWidget);
@@ -133,8 +132,8 @@ void main() {
     (tester) async {
       final store = await newStore();
       await pumpPhone(tester, AccountScreen(store: store));
-      await tester.ensureVisible(find.text('Editează'));
-      await tester.tap(find.text('Editează'));
+      await tester.ensureVisible(find.text('Edit'));
+      await tester.tap(find.text('Edit'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('profile-name')), 'David');
       await tester.ensureVisible(find.byKey(const Key('profile-weight')));
@@ -146,6 +145,9 @@ void main() {
       expect(store.name, 'David');
       expect(store.profile.weightKg, 82.5);
       expect(store.profile.heightCm, 181);
+      expect(store.bodyMeasurements, hasLength(1));
+      expect(store.bodyMeasurements.single.weightKg, 82.5);
+      expect(store.bodyMeasurements.single.heightCm, 181);
       final reloaded = AppStore(store.preferences);
       await reloaded.load();
       expect(reloaded.name, 'David');
@@ -159,8 +161,8 @@ void main() {
   ) async {
     final store = await newStore();
     await pumpPhone(tester, AccountScreen(store: store));
-    await tester.ensureVisible(find.text('Editează'));
-    await tester.tap(find.text('Editează'));
+    await tester.ensureVisible(find.text('Edit'));
+    await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('profile-name')), 'Changed');
     await tester.ensureVisible(find.byKey(const Key('profile-age')));
@@ -168,10 +170,10 @@ void main() {
     await tester.tap(find.byKey(const Key('save-training-profile')));
     await tester.pumpAndSettle();
     expect(
-      find.text('Introdu un număr întreg între 13 și 100.'),
+      find.text('Enter a whole number between 13 and 100.'),
       findsOneWidget,
     );
-    expect(store.name, 'Atlet');
+    expect(store.name, 'Athlete');
     expect(store.profile.age, isNull);
     expect(tester.takeException(), isNull);
   });
@@ -184,26 +186,26 @@ void main() {
         UserProfile(
           sessionsPerWeek: 5,
           sessionMinutes: 30,
-          equipment: ['Gantere'],
+          equipment: ['Dumbbells'],
         ),
       );
       await pumpPhone(tester, CoachScreen(store: store));
-      expect(find.text('Coach local · adaptat profilului'), findsOneWidget);
-      expect(find.text('5 zile / săpt.'), findsOneWidget);
-      expect(find.text('30 min'), findsOneWidget);
+      expect(find.text('Local coach · tailored to you'), findsOneWidget);
+      expect(find.textContaining('5 days/week'), findsOneWidget);
+      expect(find.textContaining('30 min'), findsOneWidget);
       await tester.enterText(
         find.byKey(const Key('coach-message')),
-        'Fă-mi un program pentru profilul meu.',
+        'How should I recover between workouts?',
       );
-      await tester.tap(find.byTooltip('Trimite'));
+      await tester.tap(find.byTooltip('Send'));
       await tester.pumpAndSettle();
       final reply = tester
           .widgetList<SelectableText>(find.byType(SelectableText))
           .map((w) => w.data ?? '')
-          .firstWhere((text) => text.contains('Sugestie locală'));
-      expect(reply, contains('5 ședințe/săptămână'));
-      expect(reply, contains('30 min/ședință'));
-      expect(reply, contains('Gantere'));
+          .firstWhere((text) => text.contains('Local suggestion'));
+      expect(reply, contains('5 sessions/week'));
+      expect(reply, contains('30 min/session'));
+      expect(reply, contains('Dumbbells'));
       expect(
         tester
             .widget<TextField>(find.byKey(const Key('coach-message')))
@@ -219,17 +221,17 @@ void main() {
     'profile view follows isolated account data and restores the guest',
     (tester) async {
       final store = await newStore();
-      await store.updateProfile('Vizitator', store.goal);
+      await store.updateProfile('Guest', store.goal);
       await pumpPhone(tester, AccountScreen(store: store, embedded: true));
-      expect(find.text('Vizitator'), findsOneWidget);
+      expect(find.text('Guest'), findsOneWidget);
       await store.switchAccount('user-one');
       await store.updateProfile('David', store.goal);
       await tester.pumpAndSettle();
       expect(find.text('David'), findsOneWidget);
-      expect(find.text('Vizitator'), findsNothing);
+      expect(find.text('Guest'), findsNothing);
       await store.switchAccount(null);
       await tester.pumpAndSettle();
-      expect(find.text('Vizitator'), findsOneWidget);
+      expect(find.text('Guest'), findsOneWidget);
       expect(find.text('David'), findsNothing);
       expect(tester.takeException(), isNull);
     },
@@ -242,15 +244,15 @@ void main() {
       await pumpPhone(tester, CoachScreen(store: store));
       await tester.enterText(
         find.byKey(const Key('coach-message')),
-        'Vreau un program doar pentru mine.',
+        'How should I recover between workouts?',
       );
-      await tester.tap(find.byTooltip('Trimite'));
+      await tester.tap(find.byTooltip('Send'));
       await tester.pumpAndSettle();
       expect(find.byType(SelectableText), findsWidgets);
       await store.switchAccount('another-user');
       await tester.pumpAndSettle();
       expect(find.byType(SelectableText), findsNothing);
-      expect(find.text('Un plan care\nține cont de tine.'), findsOneWidget);
+      expect(find.text('A plan that\nfits your life.'), findsOneWidget);
       expect(
         tester
             .widget<TextField>(find.byKey(const Key('coach-message')))
@@ -267,21 +269,21 @@ void main() {
     (tester) async {
       final store = await newStore();
       await store.updateUserProfile(
-        UserProfile(limitations: 'Prefer exercițiile fără sărituri.'),
+        UserProfile(limitations: 'I prefer exercises without jumps.'),
       );
       await pumpPhone(tester, CoachScreen(store: store));
-      expect(find.text('Coach local · adaptat profilului'), findsOneWidget);
+      expect(find.text('Local coach · tailored to you'), findsOneWidget);
       await tester.enterText(
         find.byKey(const Key('coach-message')),
-        'Fă-mi un program săptămânal adaptat profilului.',
+        'How should I increase weights safely?',
       );
-      await tester.tap(find.byTooltip('Trimite'));
+      await tester.tap(find.byTooltip('Send'));
       await tester.pumpAndSettle();
       final reply = tester
           .widgetList<SelectableText>(find.byType(SelectableText))
           .map((w) => w.data ?? '')
-          .firstWhere((text) => text.contains('Sugestie locală'));
-      expect(reply, contains('Prefer exercițiile fără sărituri.'));
+          .firstWhere((text) => text.contains('Local suggestion'));
+      expect(reply, contains('I prefer exercises without jumps.'));
       expect(store.profile.coachConsent, isFalse);
       await tester.pumpWidget(
         MaterialApp(
@@ -308,10 +310,10 @@ void main() {
       final gateway = _DelayedGateway('account-a');
       addTearDown(gateway.dispose);
       await pumpPhone(tester, AccountScreen(store: store, gateway: gateway));
-      await tester.ensureVisible(find.text('Restaurează din cloud'));
-      await tester.tap(find.text('Restaurează din cloud'));
+      await tester.ensureVisible(find.text('Restore from cloud'));
+      await tester.tap(find.text('Restore from cloud'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Restaurează'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Restore'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
       expect(gateway.loadCalls, 1);
@@ -336,12 +338,12 @@ void main() {
       final gateway = _DelayedGateway('account-a');
       addTearDown(gateway.dispose);
       await pumpPhone(tester, AccountScreen(store: store, gateway: gateway));
-      await tester.ensureVisible(find.text('Salvează backup în cloud'));
-      await tester.tap(find.text('Salvează backup în cloud'));
+      await tester.ensureVisible(find.text('Save cloud backup'));
+      await tester.tap(find.text('Save cloud backup'));
       await tester.pumpAndSettle();
       expect(gateway.saveCalls, 0);
       expect(
-        find.textContaining('Contul nu este încă pregătit'),
+        find.textContaining('Your account is not ready yet'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
