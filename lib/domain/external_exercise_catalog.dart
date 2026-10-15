@@ -1,7 +1,7 @@
 import 'models.dart';
 
 /// English catalog with stable legacy IDs. Source revision: f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5.
-/// The Unlicense; see docs/exercise-sources.md. Illustrations are original vectors.
+/// The Unlicense; see docs/exercise-sources.md. Exercise visuals use Material icons.
 const List<Exercise> externalExerciseCatalog = [
   Exercise(
     id: 'bench_press',

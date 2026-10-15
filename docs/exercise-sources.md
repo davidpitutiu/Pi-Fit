@@ -1,4 +1,4 @@
-# Exercise catalog and vector illustrations
+# Exercise catalog and icons
 
 Pi Fit includes all **876 records** from the open [Free Exercise DB](https://github.com/yuhonas/free-exercise-db), pinned at commit `f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5`, plus original Bird Dog and Two-Hand Kettlebell Swing entries. The upstream database is distributed under the **Unlicense**; its snapshot/provenance are retained in `assets/exercise-data/catalog.json`.
 
@@ -8,9 +8,11 @@ The app displays English names, metadata and instructions. Original English sour
 
 ## Rendering
 
-Exercise pictures are original Flutter vector drawings (`lib/ui/exercise_illustration.dart`) across 23 movement families, selected from the actual exercise's name, movement, equipment and muscle metadata. They scale without raster downloads and follow the light/dark/lime theme. Supported families have two positions; held movements have one. The pictures are movement-family overviews, not 878 individually verified anatomical animations. The detail screen says to follow the exercise-specific written instructions.
+Exercises, routine cards, workout headers and details use a consistent Material icon system (`lib/ui/exercise_icon.dart` and `exercise_image.dart`). Icons are selected from the actual exercise's equipment and training category, including free weights, cable, machine, bodyweight, core, mobility and cardio. They follow the light/dark/lime theme and use Flutter's bundled Material Icons font. The icon glyphs are provided by the Flutter SDK under its included licenses.
 
-The previous bundled JPEGs and network photo renderer have been removed. No Free Exercise DB photos or Hevy images are shipped. Exercise data is from the open source above; Pi Fit does not assert knowledge of Hevy's internal database.
+Icons identify the exercise category; they do not demonstrate technique or show start/finish poses. The exercise-specific written instructions remain available in details. Several related exercises intentionally share one recognizable icon. No photos, human anatomy drawings, motion illustrations or remote images are rendered.
+
+The previous JPEGs, network-photo renderer and anatomy-illustration renderer have been removed. No Free Exercise DB photos or Hevy images are shipped. Exercise data is from the open source above; Pi Fit does not assert knowledge of Hevy's internal database.
 
 ## Reproduce or update
 

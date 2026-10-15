@@ -1,4 +1,4 @@
-# Pi Fit 0.3.0 verification
+# Pi Fit 0.3.1 verification
 
 Checks performed on 15 October 2026 in the Linux cloud environment.
 
@@ -6,14 +6,41 @@ Checks performed on 15 October 2026 in the Linux cloud environment.
 | --- | --- |
 | Repeatable setup | `bash scripts/setup_cloud.sh` re-ran successfully with frozen dependency lockfiles |
 | Flutter analyzer | No issues |
-| Full Flutter suite | 212 tests passed; 23 calendar/notification tests passed after the final route-name fix |
-| Backend TypeScript / Node | Compilation and 17 tests passed; provider responses are simulated |
+| Full Flutter suite | 234 tests passed |
+| Backend TypeScript / Node | Unchanged from 0.3.0: compilation and 17 tests passed; provider responses are simulated |
 | Firebase configuration helper | 4 Python tests passed |
 | Catalog reproducibility | All 876 upstream records reproduce 878 English movements with legacy IDs retained |
 | Web release | Built with local renderer resources and a vendored, integrity-verified PDF.js library |
 | Android release | ARM64, ARMv7 and x86_64 split APKs built |
-| Android package | `com.pifit.app`, version 0.3.0, minSdk 26 / targetSdk 36; APK signature verified |
+| Android package | `com.pifit.app`, version 0.3.1, minSdk 26 / targetSdk 36; APK signature verified |
 | Notification resources | `ic_notification` survives shrinking; action receiver and six Health read permissions are packaged |
+
+## Signup, icons and muscle focus in 0.3.1
+
+A regression test reproduced the exact `navigator.dart:5950` assertion
+`_history.isNotEmpty` against the previous unconditional auth-screen pop. Firebase
+can emit the user before signup finishes its optional profile/email steps; the
+auth gate closes the form, then its still-mounted reverse animation allowed a
+second pop to remove home. The form now dismisses only its own current, non-root
+route, and the gate checks the active account after every asynchronous boundary.
+
+New tests cover signup/login completion during route exit, restored signed-in
+startup and repeated auth events, late previous-account completion, optional
+verification warnings after the form is disposed, and bounded credential/setup
+requests. They use fake SDK users; no new real accounts or emails were created.
+The existing live REST result below is from the earlier verification.
+
+Exercise and routine visuals now use bundled Material icons. The human vector
+renderer and pose gallery were removed. Catalog-wide and widget coverage checks
+that legacy image URLs never load, and that details retain written instructions.
+
+Muscle focus counts valid completed strength sets once toward the catalog primary
+muscle. Group shares use attributed primary sets only; secondary involvement has
+its own exercise breakdown and never increases those shares. All catalog groups
+are available, including zero-primary-set groups. Tests cover exact fractions,
+7/28/90-day windows, more than six active groups, empty data, account changes and
+320 px layouts with larger text. Chart slider accessibility indices are clamped
+when a period change temporarily changes their range.
 
 ## What the tests cover
 
@@ -37,6 +64,18 @@ coach requests, notifications and Watch events are covered by isolation tests.
 The native Watch code also rejects callbacks from superseded sensor sessions.
 
 ## Browser and PDF checks
+
+The 0.3.1 release web build was checked in Chromium for dark/light home and
+exercise search, icon-based workout logging, muscle-focus overview and its
+primary/secondary breakdown. Period changes showed 18 / 72 / 90 completed
+strength sets for the isolated 7 / 28 / 90-day demo fixture. Dark/light 390 px,
+light 320 px and empty-history states rendered without horizontal overflow.
+Screenshots include the new muscle-focus chart and breakdown. Browser signup is
+still not claimed as a live provider/device test; the exact navigation race is
+covered by the deterministic Flutter regression above.
+
+The following existing flows were additionally validated for 0.3.0 and remain
+covered by the current suite:
 
 Chromium checks use a 390 × 844 viewport and the Europe/Bucharest time zone.
 Dark/light home, English exercise search, profile, body history, progress charts,

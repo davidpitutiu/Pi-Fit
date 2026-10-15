@@ -719,8 +719,11 @@ class _AccountScreenState extends State<AccountScreen> {
 
   void _openAuth(bool register) => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) =>
-          AuthScreen(store: widget.store, initialRegister: register),
+      builder: (_) => AuthScreen(
+        store: widget.store,
+        initialRegister: register,
+        gateway: gateway,
+      ),
     ),
   );
 }
@@ -728,17 +731,19 @@ class _AccountScreenState extends State<AccountScreen> {
 class AuthScreen extends StatefulWidget {
   final AppStore store;
   final bool initialRegister;
+  final FirebaseGateway? gateway;
   const AuthScreen({
     super.key,
     required this.store,
     this.initialRegister = false,
+    this.gateway,
   });
   @override
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final gateway = FirebaseGateway.instance;
+  FirebaseGateway get gateway => widget.gateway ?? FirebaseGateway.instance;
   final form = GlobalKey<FormState>();
   final email = TextEditingController(),
       password = TextEditingController(),
@@ -778,53 +783,80 @@ class _AuthScreenState extends State<AuthScreen> {
       busy = true;
       error = null;
     });
-    final initialAuthUid = gateway.currentUser?.uid;
-    final initialAccountId = widget.store.accountId;
+    FocusScope.of(context).unfocus();
+    final authGateway = gateway;
+    final store = widget.store;
+    final authRoute = ModalRoute.of(context);
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final initialAuthUid = authGateway.currentUser?.uid;
+    final initialAccountId = store.accountId;
+    final creatingAccount = register;
+    final requestedName = name.text;
     String? operationUid;
     try {
       String? profileWarning;
-      if (register) {
-        final requestedName = name.text;
-        operationUid = await gateway.signUp(
+      if (creatingAccount) {
+        operationUid = await authGateway.signUp(
           email.text,
           password.text,
           requestedName,
         );
-        if (gateway.currentUser?.uid != operationUid) return;
-        await widget.store.switchAccount(operationUid);
-        if (gateway.currentUser?.uid != operationUid ||
-            widget.store.accountId != operationUid) {
+        if (authGateway.currentUser?.uid != operationUid) return;
+        await store.switchAccount(operationUid);
+        if (authGateway.currentUser?.uid != operationUid ||
+            store.accountId != operationUid) {
           return;
         }
         try {
-          await widget.store.updateProfile(requestedName, widget.store.goal);
+          await store.updateProfile(requestedName, store.goal);
         } catch (_) {
           profileWarning =
               'Account created. Your name could not be saved locally; update it in Profile. Check your verification email too.';
         }
       } else {
-        operationUid = await gateway.signIn(email.text, password.text);
-        if (gateway.currentUser?.uid != operationUid) return;
-        await widget.store.switchAccount(operationUid);
+        operationUid = await authGateway.signIn(email.text, password.text);
+        if (authGateway.currentUser?.uid != operationUid) return;
+        await store.switchAccount(operationUid);
       }
-      if (mounted &&
-          gateway.currentUser?.uid == operationUid &&
-          widget.store.accountId == operationUid) {
-        toast(
-          context,
-          profileWarning ??
-              (register
-                  ? 'Account created. Check your verification email.'
-                  : 'Welcome back to Pi Fit.'),
-        );
-        Navigator.of(context).pop();
+      if (authGateway.currentUser?.uid == operationUid &&
+          store.accountId == operationUid) {
+        final setupWarning = creatingAccount
+            ? authGateway.registrationWarningFor(operationUid)
+            : null;
+        // AuthScopeGate can dismiss this screen as soon as Firebase emits the
+        // user, before optional name/email setup finishes. Report the result
+        // through the still-mounted app messenger without using this route's
+        // possibly disposed context.
+        if (messenger.mounted) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                setupWarning ??
+                    profileWarning ??
+                    (creatingAccount
+                        ? 'Account created. Check your verification email.'
+                        : 'Welcome back to Pi Fit.'),
+              ),
+            ),
+          );
+        }
+        // A popped route remains mounted during its reverse animation. Only
+        // dismiss our own current route; a second pop would remove home.
+        if (mounted &&
+            authRoute?.isCurrent == true &&
+            !authRoute!.isFirst &&
+            navigator.mounted &&
+            navigator.canPop()) {
+          await navigator.maybePop();
+        }
       }
     } catch (e) {
       if (mounted &&
           (operationUid == null
-              ? gateway.currentUser?.uid == initialAuthUid &&
-                    widget.store.accountId == initialAccountId
-              : gateway.currentUser?.uid == operationUid)) {
+              ? authGateway.currentUser?.uid == initialAuthUid &&
+                    store.accountId == initialAccountId
+              : authGateway.currentUser?.uid == operationUid)) {
         setState(() => error = _readableError(e));
       }
     } finally {

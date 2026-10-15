@@ -28,6 +28,8 @@ class _FakeAuthUser extends Fake implements User {
   final verificationStarted = Completer<void>();
   Completer<void>? nameHold;
   Completer<void>? verificationHold;
+  Object? nameError;
+  Object? verificationError;
   int verificationCalls = 0;
 
   @override
@@ -35,6 +37,7 @@ class _FakeAuthUser extends Fake implements User {
     displayName = name;
     nameStarted.complete();
     if (nameHold != null) await nameHold!.future;
+    if (nameError != null) throw nameError!;
   }
 
   @override
@@ -42,6 +45,7 @@ class _FakeAuthUser extends Fake implements User {
     verificationCalls++;
     verificationStarted.complete();
     if (verificationHold != null) await verificationHold!.future;
+    if (verificationError != null) throw verificationError!;
   }
 }
 
@@ -49,18 +53,25 @@ class _FakeAuth extends Fake implements FirebaseAuth {
   User? activeUser;
   late UserCredential credential;
   int signOutCalls = 0;
+  Completer<void>? signInHold;
+  Completer<void>? createHold;
   @override
   User? get currentUser => activeUser;
   @override
   Future<UserCredential> signInWithEmailAndPassword({
     required String email,
     required String password,
-  }) async => credential;
+  }) async {
+    if (signInHold != null) await signInHold!.future;
+    return credential;
+  }
+
   @override
   Future<UserCredential> createUserWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
+    if (createHold != null) await createHold!.future;
     activeUser = credential.user;
     return credential;
   }
@@ -227,7 +238,7 @@ void main() {
     );
 
     test(
-      'sign up returns its created UID if account changes while verification completes',
+      'sign up rejects an account change while verification completes',
       () async {
         final alice = _FakeAuthUser('alice')
           ..verificationHold = Completer<void>();
@@ -242,11 +253,23 @@ void main() {
           'test-password',
           'Alice',
         );
+        final checked = expectLater(
+          signup,
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains('the active account changed'),
+            ),
+          ),
+        );
         await alice.verificationStarted.future;
         auth.activeUser = _FakeAuthUser('bob');
         alice.verificationHold!.complete();
-        expect(await signup, 'alice');
+        await checked;
         expect(gateway.currentUser!.uid, 'bob');
+        expect(gateway.registrationWarningFor('alice'), isNull);
+        expect(gateway.registrationWarningFor('bob'), isNull);
       },
     );
 
@@ -283,6 +306,188 @@ void main() {
         expect(alice.verificationCalls, 0);
         expect(bob.verificationCalls, 0);
         expect(bob.displayName, isNull);
+      },
+    );
+  });
+
+  group('bounded authentication and optional registration setup', () {
+    setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.android);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test(
+      'a stalled sign in reports that its request may still finish',
+      () async {
+        final auth = _FakeAuth()
+          ..credential = _FakeCredential(_FakeAuthUser('alice'))
+          ..signInHold = Completer<void>();
+        final gateway = FirebaseGateway.forTesting(
+          initializer: (_) async => _FakeFirebaseApp(),
+          auth: auth,
+          authOperationTimeout: const Duration(milliseconds: 10),
+        );
+        await gateway.initialize();
+        await expectLater(
+          gateway.signIn('alice@example.invalid', 'test-password'),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains('was not cancelled and may still finish'),
+            ),
+          ),
+        );
+        auth.signInHold!.complete();
+        await Future<void>.delayed(Duration.zero);
+        expect(gateway.registrationWarningFor('alice'), isNull);
+      },
+    );
+
+    test(
+      'a late account creation cannot start profile setup or email',
+      () async {
+        final alice = _FakeAuthUser('alice');
+        final auth = _FakeAuth()
+          ..credential = _FakeCredential(alice)
+          ..createHold = Completer<void>();
+        final gateway = FirebaseGateway.forTesting(
+          initializer: (_) async => _FakeFirebaseApp(),
+          auth: auth,
+          authOperationTimeout: const Duration(milliseconds: 10),
+        );
+        await gateway.initialize();
+        await expectLater(
+          gateway.signUp('alice@example.invalid', 'test-password', 'Alice'),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains('was not cancelled and may still finish'),
+            ),
+          ),
+        );
+        expect(auth.currentUser, isNull);
+        auth.createHold!.complete();
+        await Future<void>.delayed(Duration.zero);
+        // The SDK can still authenticate late; the gate handles that event.
+        expect(auth.currentUser!.uid, 'alice');
+        expect(alice.nameStarted.isCompleted, isFalse);
+        expect(alice.verificationCalls, 0);
+        expect(gateway.registrationWarningFor('alice'), isNull);
+      },
+    );
+
+    test('name timeout preserves the UID and prevents a late email', () async {
+      final alice = _FakeAuthUser('alice')..nameHold = Completer<void>();
+      final auth = _FakeAuth()..credential = _FakeCredential(alice);
+      final gateway = FirebaseGateway.forTesting(
+        initializer: (_) async => _FakeFirebaseApp(),
+        auth: auth,
+        accountSetupTimeout: const Duration(milliseconds: 10),
+      );
+      await gateway.initialize();
+      expect(
+        await gateway.signUp('alice@example.invalid', 'test-password', 'Alice'),
+        'alice',
+      );
+      expect(gateway.currentUser!.uid, 'alice');
+      expect(
+        gateway.registrationWarningFor('alice'),
+        contains('did not finish in time'),
+      );
+      expect(gateway.registrationWarningFor('bob'), isNull);
+      alice.nameHold!.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(alice.verificationCalls, 0);
+    });
+
+    test(
+      'verification timeout preserves the UID and handles a late SDK error',
+      () async {
+        final alice = _FakeAuthUser('alice')
+          ..verificationHold = Completer<void>();
+        final auth = _FakeAuth()..credential = _FakeCredential(alice);
+        final gateway = FirebaseGateway.forTesting(
+          initializer: (_) async => _FakeFirebaseApp(),
+          auth: auth,
+          accountSetupTimeout: const Duration(milliseconds: 10),
+        );
+        await gateway.initialize();
+        expect(
+          await gateway.signUp(
+            'alice@example.invalid',
+            'test-password',
+            'Alice',
+          ),
+          'alice',
+        );
+        expect(alice.displayName, 'Alice');
+        expect(alice.verificationCalls, 1);
+        expect(gateway.registrationWarningFor('alice'), contains('resend'));
+        alice.verificationHold!.completeError(
+          FirebaseAuthException(code: 'network-request-failed'),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(alice.verificationCalls, 1);
+      },
+    );
+
+    test(
+      'optional setup failure preserves successful creation with a scoped warning',
+      () async {
+        final alice = _FakeAuthUser('alice')
+          ..nameError = FirebaseAuthException(code: 'network-request-failed');
+        final auth = _FakeAuth()..credential = _FakeCredential(alice);
+        final gateway = FirebaseGateway.forTesting(
+          initializer: (_) async => _FakeFirebaseApp(),
+          auth: auth,
+        );
+        await gateway.initialize();
+        expect(
+          await gateway.signUp(
+            'alice@example.invalid',
+            'test-password',
+            'Alice',
+          ),
+          'alice',
+        );
+        expect(
+          gateway.registrationWarningFor('alice'),
+          contains('could not be completed'),
+        );
+        expect(gateway.registrationWarningFor('bob'), isNull);
+        expect(alice.verificationCalls, 0);
+      },
+    );
+
+    test(
+      'an account change during a setup timeout cannot report success',
+      () async {
+        final alice = _FakeAuthUser('alice')..nameHold = Completer<void>();
+        final auth = _FakeAuth()..credential = _FakeCredential(alice);
+        final gateway = FirebaseGateway.forTesting(
+          initializer: (_) async => _FakeFirebaseApp(),
+          auth: auth,
+          accountSetupTimeout: const Duration(milliseconds: 10),
+        );
+        await gateway.initialize();
+        final checked = expectLater(
+          gateway.signUp('alice@example.invalid', 'test-password', 'Alice'),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains('the active account changed'),
+            ),
+          ),
+        );
+        await alice.nameStarted.future;
+        auth.activeUser = _FakeAuthUser('bob');
+        await checked;
+        alice.nameHold!.complete();
+        await Future<void>.delayed(Duration.zero);
+        expect(alice.verificationCalls, 0);
+        expect(gateway.registrationWarningFor('alice'), isNull);
+        expect(gateway.registrationWarningFor('bob'), isNull);
       },
     );
   });

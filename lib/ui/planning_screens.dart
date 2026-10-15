@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../domain/models.dart';
+import '../domain/muscle_focus.dart';
 import '../domain/training_analytics.dart';
 import '../services/notification_service.dart';
 import '../state/app_store.dart';
@@ -898,6 +899,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   _TrendMetric _metric = _TrendMetric.volume;
   String? _exerciseId;
   bool _showEstimatedMax = false;
+  final _muscleFocusKey = GlobalKey();
   AppStore get store => widget.store;
 
   @override
@@ -910,6 +912,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
         now: analytics.asOf,
       ).length;
       final series = buildTrainingSeries(
+        history: store.history,
+        exercises: store.exercises,
+        days: _days,
+        now: analytics.asOf,
+      );
+      final muscleFocus = buildMuscleFocus(
         history: store.history,
         exercises: store.exercises,
         days: _days,
@@ -1025,6 +1033,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     showCheckmark: false,
                     onSelected: (_) => setState(() => _days = days),
                   ),
+                ActionChip(
+                  key: const ValueKey('jump-muscle-focus'),
+                  avatar: const Icon(Icons.donut_large_rounded, size: 17),
+                  label: const Text('Muscle focus'),
+                  onPressed: () {
+                    final target = _muscleFocusKey.currentContext;
+                    if (target != null) {
+                      Scrollable.ensureVisible(
+                        target,
+                        alignment: .08,
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOutCubic,
+                      );
+                    }
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -1094,6 +1118,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ],
                 );
               },
+            ),
+            SectionHeading(
+              title: 'Muscle focus',
+              action: 'How it works',
+              onAction: () => _showExplanation(
+                context,
+                'How muscle focus works',
+                [
+                  muscleFocus.explanation,
+                  'Percentages use completed primary sets divided by all attributed primary strength sets in this period. Every eligible set appears once. Percentages are rounded.',
+                ],
+              ),
+            ),
+            KeyedSubtree(
+              key: _muscleFocusKey,
+              child: _MuscleFocusCard(store: store, summary: muscleFocus),
             ),
             const SectionHeading(title: 'Training over time'),
             _TrainingTrendCard(
@@ -1200,16 +1240,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 ],
               ),
             ),
-            const SectionHeading(title: 'Where you put in the work'),
-            if (series.muscles.isEmpty)
-              _PlanningEmpty(
-                icon: Icons.accessibility_new_rounded,
-                title: 'Your muscle map is taking shape',
-                subtitle:
-                    'Checked sets from the last $_days days appear here, grouped by the primary muscle.',
-              )
-            else
-              _MuscleDistribution(muscles: series.muscles, days: _days),
             SectionHeading(
               title: 'Personal records',
               action: 'About 1RM',
@@ -1582,7 +1612,7 @@ class _TrainingTrendCardState extends State<_TrainingTrendCard> {
                 max: (bins.length - 1).toDouble(),
                 divisions: bins.length - 1,
                 semanticFormatterCallback: (value) {
-                  final bin = bins[value.round()];
+                  final bin = bins[value.round().clamp(0, bins.length - 1)];
                   return '${bin.dateLabel}: ${_number(bin.value)} $unit';
                 },
                 onChanged: (value) => setState(() => _selected = value.round()),
@@ -1957,8 +1987,10 @@ class _ExerciseProgressChartState extends State<_ExerciseProgressChart> {
             max: (points.length - 1).toDouble(),
             divisions: points.length - 1,
             value: selected.toDouble(),
-            semanticFormatterCallback: (value) =>
-                '${formatDate(points[value.round()].date)}: ${_number(points[value.round()].value)} kg',
+            semanticFormatterCallback: (value) {
+              final point = points[value.round().clamp(0, points.length - 1)];
+              return '${formatDate(point.date)}: ${_number(point.value)} kg';
+            },
             onChanged: (value) => setState(() => _selected = value.round()),
           ),
           Text(
@@ -2352,23 +2384,75 @@ class _StatCard extends StatelessWidget {
   );
 }
 
-class _MuscleDistribution extends StatelessWidget {
-  const _MuscleDistribution({
-    required this.muscles,
-    this.expanded = false,
-    this.days = 28,
-  });
-  final List<MuscleVolume> muscles;
-  final bool expanded;
-  final int days;
+const _focusPalette = [
+  Color(0xFFC7FF3D),
+  Color(0xFF79EEC6),
+  Color(0xFF4DD4A0),
+  Color(0xFF9CDC65),
+  Color(0xFF79CFC7),
+  Color(0xFF56B49B),
+  Color(0xFFA6E38A),
+  Color(0xFF52AC89),
+  Color(0xFFC0DD86),
+  Color(0xFF80BD76),
+  Color(0xFFB5EBD4),
+  Color(0xFF67DFC1),
+  Color(0xFF81A98C),
+  Color(0xFFD4F49B),
+  Color(0xFF96D6AB),
+];
+
+String _focusShare(MuscleFocusGroup group, int total) =>
+    total == 0 ? '—' : '${group.percentage.toStringAsFixed(1)}%';
+
+class _MuscleFocusCard extends StatefulWidget {
+  const _MuscleFocusCard({required this.store, required this.summary});
+  final AppStore store;
+  final MuscleFocusSummary summary;
+
+  @override
+  State<_MuscleFocusCard> createState() => _MuscleFocusCardState();
+}
+
+class _MuscleFocusCardState extends State<_MuscleFocusCard> {
+  bool _showZeros = false;
+  String? _selectedMuscle;
+
+  Future<void> _details(MuscleFocusGroup group) async {
+    setState(() => _selectedMuscle = group.muscle);
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (_) => _MuscleFocusDetails(
+        store: widget.store,
+        muscle: group.muscle,
+        days: widget.summary.days,
+        accountId: widget.store.accountId,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final total = muscles.fold<int>(
-      0,
-      (value, muscle) => value + muscle.completedSets,
-    );
-    final visible = expanded ? muscles : muscles.take(6);
+    final summary = widget.summary;
+    final active = summary.groups
+        .where((group) => group.primarySets > 0)
+        .toList();
+    final zero = summary.groups
+        .where((group) => group.primarySets == 0)
+        .toList();
+    var selected = summary.groups
+        .where((group) => group.muscle == _selectedMuscle)
+        .firstOrNull;
+    if (selected == null && active.isNotEmpty) {
+      selected = active.reduce(
+        (first, next) => next.primarySets > first.primarySets ? next : first,
+      );
+    }
+    Color color(MuscleFocusGroup group) =>
+        _focusPalette[summary.groups.indexOf(group) % _focusPalette.length];
+    final selectedGroup = selected;
     return PiCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2379,74 +2463,515 @@ class _MuscleDistribution extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Last $days days · secondary muscles are not counted twice',
-            style: TextStyle(color: PiColors.muted(context), fontSize: 11),
+            '${summary.totalPrimarySets} completed strength ${summary.totalPrimarySets == 1 ? 'set' : 'sets'} · last ${summary.days} days',
+            key: const ValueKey('muscle-focus-total'),
+            style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
           ),
-          const SizedBox(height: 20),
-          for (final muscle in visible)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          muscle.muscle,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '${muscle.completedSets} ${muscle.completedSets == 1 ? 'set' : 'sets'}',
-                        style: TextStyle(
-                          color: PiColors.muted(context),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 9),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: total == 0 ? 0 : muscle.completedSets / total,
-                      minHeight: 6,
-                      color: Theme.of(context).colorScheme.primary,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: .06),
-                    ),
-                  ),
-                ],
+          const SizedBox(height: 6),
+          Text(
+            '${formatDate(summary.start)} — ${formatDate(summary.asOf)}',
+            style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+          ),
+          const SizedBox(height: 22),
+          if (summary.totalPrimarySets == 0) ...[
+            Center(
+              child: Icon(
+                Icons.donut_large_rounded,
+                size: 64,
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: .7),
               ),
             ),
-          if (!expanded && muscles.length > 6)
-            TextButton(
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                useSafeArea: true,
-                builder: (_) => SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
-                  child: _MuscleDistribution(
-                    muscles: muscles,
-                    expanded: true,
-                    days: days,
+            const SizedBox(height: 16),
+            Text(
+              'Your next set starts the picture.',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No completed strength sets in this period. Log a strength workout, or choose a longer period to see your muscle focus.',
+              style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => RoutinesScreen(store: widget.store),
+                ),
+              ),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Choose a strength workout'),
+            ),
+          ] else ...[
+            Center(
+              child: Semantics(
+                label:
+                    'Muscle distribution. ${summary.totalPrimarySets} completed strength sets across ${active.length} primary muscle groups. Select a group below for its exercise breakdown.',
+                child: ExcludeSemantics(
+                  child: GestureDetector(
+                    onTapUp: (details) {
+                      final offset =
+                          details.localPosition - const Offset(95, 95);
+                      if (offset.distance < 57 || offset.distance > 95) return;
+                      final angle =
+                          (math.atan2(offset.dy, offset.dx) + math.pi / 2) %
+                          (math.pi * 2);
+                      var end = 0.0;
+                      for (final group in active) {
+                        end += group.share * math.pi * 2;
+                        if (angle <= end) {
+                          setState(() => _selectedMuscle = group.muscle);
+                          return;
+                        }
+                      }
+                    },
+                    child: SizedBox(
+                      width: 190,
+                      height: 190,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned.fill(
+                            child: CustomPaint(
+                              painter: _MuscleFocusPainter(
+                                groups: active,
+                                selected: selectedGroup?.muscle,
+                                colors: [
+                                  for (final group in active) color(group),
+                                ],
+                                background: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: .06),
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 110,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    selectedGroup == null
+                                        ? '${summary.totalPrimarySets}'
+                                        : _focusShare(
+                                            selectedGroup,
+                                            summary.totalPrimarySets,
+                                          ),
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -1.2,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  'of primary sets',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: PiColors.muted(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-              child: Text('View all ${muscles.length} groups'),
             ),
+            if (selectedGroup != null) ...[
+              const SizedBox(height: 16),
+              Center(
+                child: Text(
+                  selectedGroup.muscle,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Center(
+                child: Text(
+                  '${selectedGroup.primarySets} of ${summary.totalPrimarySets} primary sets',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: PiColors.muted(context),
+                  ),
+                ),
+              ),
+              Center(
+                child: TextButton(
+                  onPressed: () => _details(selectedGroup),
+                  child: const Text('View group details'),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            for (final group in active)
+              _MuscleFocusRow(
+                group: group,
+                total: summary.totalPrimarySets,
+                color: color(group),
+                onTap: () => _details(group),
+              ),
+          ],
+          if (zero.isNotEmpty) ...[
+            if (active.isNotEmpty) const Divider(height: 20),
+            InkWell(
+              key: const ValueKey('show-zero-muscle-groups'),
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => setState(() => _showZeros = !_showZeros),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _showZeros
+                            ? 'Hide groups with no primary sets'
+                            : summary.totalPrimarySets == 0
+                            ? 'Explore all ${zero.length} muscle groups'
+                            : 'Show ${zero.length} groups with no primary sets',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Icon(
+                      _showZeros
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_showZeros)
+              for (final group in zero)
+                _MuscleFocusRow(
+                  group: group,
+                  total: summary.totalPrimarySets,
+                  color: color(group),
+                  onTap: () => _details(group),
+                ),
+          ],
+          if (summary.unattributedSets > 0) ...[
+            const SizedBox(height: 10),
+            Text(
+              '${summary.unattributedSets} valid ${summary.unattributedSets == 1 ? 'set has' : 'sets have'} no available primary muscle tag and ${summary.unattributedSets == 1 ? 'is' : 'are'} excluded from these shares.',
+              style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Text(
+            'One strength set = one primary muscle count. Secondary involvement is listed in group details, without adding it to these percentages.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.5,
+              color: PiColors.muted(context),
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _MuscleFocusRow extends StatelessWidget {
+  const _MuscleFocusRow({
+    required this.group,
+    required this.total,
+    required this.color,
+    required this.onTap,
+  });
+  final MuscleFocusGroup group;
+  final int total;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label:
+        '${group.muscle}, ${group.primarySets} primary sets, ${total == 0 ? 'no percentage available' : _focusShare(group, total)}. Open exercise breakdown.',
+    button: true,
+    onTap: onTap,
+    excludeSemantics: true,
+    child: InkWell(
+      key: ValueKey('muscle-focus-group-${group.muscle}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: group.primarySets == 0
+                        ? PiColors.muted(context).withValues(alpha: .4)
+                        : color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    group.muscle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  _focusShare(group, total),
+                  key: ValueKey('muscle-focus-percent-${group.muscle}'),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 17,
+                  color: PiColors.muted(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: group.share,
+                minHeight: 6,
+                color: color,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: .06),
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              '${group.primarySets} primary ${group.primarySets == 1 ? 'set' : 'sets'}',
+              style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _MuscleFocusPainter extends CustomPainter {
+  const _MuscleFocusPainter({
+    required this.groups,
+    required this.colors,
+    required this.selected,
+    required this.background,
+  });
+  final List<MuscleFocusGroup> groups;
+  final List<Color> colors;
+  final String? selected;
+  final Color background;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 15;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = background
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 22,
+    );
+    var start = -math.pi / 2;
+    for (var index = 0; index < groups.length; index++) {
+      final sweep = groups[index].share * math.pi * 2;
+      final active = groups[index].muscle == selected;
+      if (active) {
+        canvas.drawArc(
+          rect,
+          start,
+          sweep,
+          false,
+          Paint()
+            ..color = colors[index].withValues(alpha: .12)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 33,
+        );
+      }
+      canvas.drawArc(
+        rect,
+        start,
+        sweep,
+        false,
+        Paint()
+          ..color = colors[index].withValues(alpha: active ? 1 : .65)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = active ? 25 : 21,
+      );
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MuscleFocusPainter oldDelegate) =>
+      oldDelegate.groups != groups ||
+      oldDelegate.selected != selected ||
+      oldDelegate.colors != colors ||
+      oldDelegate.background != background;
+}
+
+class _MuscleFocusDetails extends StatelessWidget {
+  const _MuscleFocusDetails({
+    required this.store,
+    required this.muscle,
+    required this.days,
+    required this.accountId,
+  });
+  final AppStore store;
+  final String muscle;
+  final int days;
+  final String? accountId;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * .88,
+    ),
+    child: ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        if (store.accountId != accountId) {
+          return const Padding(
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 30),
+            child: Text(
+              'Your account changed. Close this breakdown to view the current profile.',
+            ),
+          );
+        }
+        final summary = buildMuscleFocus(
+          history: store.history,
+          exercises: store.exercises,
+          days: days,
+        );
+        final group = summary.groups
+            .where((item) => item.muscle == muscle)
+            .firstOrNull;
+        if (group == null) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'This muscle group is no longer available in the catalog.',
+            ),
+          );
+        }
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 4, 22, 30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(muscle, style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text(
+                'Last $days days · ${formatDate(summary.start)} — ${formatDate(summary.asOf)}',
+                style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                '${group.primarySets} primary ${group.primarySets == 1 ? 'set' : 'sets'}',
+                key: const ValueKey('muscle-detail-primary'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                summary.totalPrimarySets == 0
+                    ? 'No primary-set percentage is available yet.'
+                    : '${_focusShare(group, summary.totalPrimarySets)} of ${summary.totalPrimarySets} attributed strength sets.',
+                style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '${group.secondarySets} secondary ${group.secondarySets == 1 ? 'mention' : 'mentions'}',
+                key: const ValueKey('muscle-detail-secondary'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'These completed sets list $muscle as a secondary muscle in the catalog. They are shown for context and are not added to the primary-set share.',
+                style: TextStyle(fontSize: 12, color: PiColors.muted(context)),
+              ),
+              const SectionHeading(title: 'Exercise breakdown'),
+              if (group.exercises.isEmpty)
+                Text(
+                  'No exercises in this period list this muscle as a primary or secondary group.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: PiColors.muted(context),
+                  ),
+                ),
+              for (final exercise in group.exercises)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: PiCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          exercise.exerciseName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          '${exercise.primarySets} primary · ${exercise.secondarySets} secondary',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: PiColors.muted(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              Text(
+                'Counts describe logged sets and catalog muscle tags, not measured activation or an ideal training balance. Percentages are rounded.',
+                style: TextStyle(fontSize: 11, color: PiColors.muted(context)),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close breakdown'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class _RecordRow extends StatelessWidget {

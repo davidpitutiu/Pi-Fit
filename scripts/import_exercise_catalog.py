@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate the complete English catalog from the pinned, checksummed snapshot.
-Stable legacy IDs and Romanian search aliases are preserved. Vector illustrations
+Stable legacy IDs and Romanian search aliases are preserved. Exercise icons
 are rendered locally; this importer never downloads exercise photographs.
 """
 from pathlib import Path
@@ -66,7 +66,7 @@ for old,item in ordered:
         body={'id':old['id'],'name':data['name'],'muscle':data['muscle'],'equipment':data['equipment'],'description':data['name']+': use a controlled, comfortable range of motion.','instructionLanguage':'en','difficulty':'Beginner','category':'Strength','movement':data['movement'],'sourceName':'Pi Fit original movement notes','aliases':[old['name'],data['name']],'steps':data['steps'],'tips':['Keep your movement controlled.','Use the illustration as an overview and follow the written instructions.']}
     blocks.append('  Exercise(\n'+'\n'.join('    '+key+': '+dart(value)+',' for key,value in body.items())+'\n  ),')
 assert len({row[0]['id'] for row in ordered}) == len(ordered)
-content="import 'models.dart';\n\n/// English catalog with stable legacy IDs. Source revision: "+revision+".\n/// The Unlicense; see docs/exercise-sources.md. Illustrations are original vectors.\nconst List<Exercise> externalExerciseCatalog = [\n"+'\n'.join(blocks)+'\n];\n'
+content="import 'models.dart';\n\n/// English catalog with stable legacy IDs. Source revision: "+revision+".\n/// The Unlicense; see docs/exercise-sources.md. Exercise visuals use Material icons.\nconst List<Exercise> externalExerciseCatalog = [\n"+'\n'.join(blocks)+'\n];\n'
 path=root/'lib/domain/external_exercise_catalog.dart'
 if args.check:
     def tokens(text):

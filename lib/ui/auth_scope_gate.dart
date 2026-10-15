@@ -81,7 +81,15 @@ class _AuthScopeGateState extends State<AuthScopeGate> {
             widget.store.goal,
           );
         }
-        if (changed && mounted) {
+        // Name persistence is another asynchronous boundary: an older
+        // account's continuation must never reset the newer account's routes.
+        if (!mounted ||
+            generation != _generation ||
+            _gateway.currentUser?.uid != uid ||
+            widget.store.accountId != uid) {
+          return;
+        }
+        if (changed) {
           widget.navigatorKey.currentState?.popUntil((route) => route.isFirst);
         }
       } catch (error) {

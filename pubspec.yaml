@@ -1,7 +1,7 @@
 name: pi_fit
-description: Pi Fit — antrenamente, progres și planificare într-un singur loc.
+description: Pi Fit — workouts, progress and planning in one place.
 publish_to: none
-version: 0.3.0+3
+version: 0.3.1+4
 environment:
   sdk: '>=3.10.0 <4.0.0'
 dependencies:

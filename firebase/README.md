@@ -188,7 +188,7 @@ From the repository root, using a Firebase CLI session authenticated as the proj
 ```sh
 cd firebase
 firebase functions:secrets:set OPENAI_API_KEY --project pi-fit-663f2
-firebase deploy --only firestore:rules,functions:coach --project pi-fit-663f2
+firebase deploy --only "firestore:rules,functions:pi-fit-coach" --project pi-fit-663f2
 ```
 
 The CLI prompts securely for the key and stores it in Secret Manager. Never put
@@ -207,6 +207,19 @@ The function runs in `europe-west1`. Copy its actual deployed HTTPS URL into the
 ```sh
 flutter run -d chrome --web-port=7357 --dart-define=AI_COACH_URL=https://YOUR_DEPLOYED_COACH_URL
 ```
+
+For a mobile build, use the same deployed HTTPS endpoint:
+
+```powershell
+flutter build apk --release --split-per-abi --dart-define=AI_COACH_URL=https://YOUR_DEPLOYED_COACH_URL
+# On macOS with Apple signing configured:
+flutter build ios --release --dart-define=AI_COACH_URL=https://YOUR_DEPLOYED_COACH_URL
+```
+
+The Android/iPhone app calls the Firebase backend directly. A previously built
+APK has no new endpoint until it is rebuilt; Chrome is only an optional test
+frontend. On Windows use `npm.cmd` / `firebase.cmd` if PowerShell blocks `.ps1`
+command shims. Store server parameters in `firebase/functions/.env.pi-fit-663f2`.
 
 For that local frontend, include `http://localhost:7357` in `ALLOWED_ORIGINS`.
 Production previews need their exact origin. Native mobile requests do not send

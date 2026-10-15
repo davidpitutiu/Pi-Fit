@@ -43,6 +43,14 @@ class _FakeGateway extends Fake implements FirebaseGateway {
 class _DelayedStore extends AppStore {
   _DelayedStore(super.preferences);
   final holds = <String, Completer<void>>{};
+  String? heldName;
+  Completer<void>? profileHold;
+  @override
+  Future<void> updateProfile(String newName, String newGoal) async {
+    if (newName == heldName) await profileHold!.future;
+    await super.updateProfile(newName, newGoal);
+  }
+
   @override
   Future<void> switchAccount(String? uid) async {
     final hold = holds[uid];
@@ -201,6 +209,46 @@ void main() {
       expect(store.accountId, 'bob');
       expect(find.text('Private: Bob private journal'), findsOneWidget);
       expect(find.text('Private: Alice private journal'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'an older display-name continuation cannot reset routes for a newer event',
+    (tester) async {
+      final store = await _store();
+      store.heldName = 'Alice';
+      store.profileHold = Completer<void>();
+      final bobHold = Completer<void>();
+      store.holds['bob'] = bobHold;
+      final gateway = _FakeGateway();
+      addTearDown(gateway.close);
+      final navigatorKey = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(_host(store, gateway, navigatorKey));
+      final pendingRoute = MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('Pending account screen')),
+      );
+      unawaited(navigatorKey.currentState!.push(pendingRoute));
+      await tester.pumpAndSettle();
+
+      gateway.emit(_FakeUser('alice', 'Alice'));
+      await tester.pump();
+      await tester.pump();
+      expect(store.accountId, 'alice');
+      gateway.emit(_FakeUser('bob', 'Bob'));
+      await tester.pump();
+      store.profileHold!.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(pendingRoute.isCurrent, isTrue);
+      expect(find.text('Opening your profile…'), findsOneWidget);
+
+      bobHold.complete();
+      await tester.pumpAndSettle();
+      expect(store.accountId, 'bob');
+      expect(pendingRoute.isCurrent, isFalse);
+      expect(find.text('Private: Bob'), findsOneWidget);
+      expect(navigatorKey.currentState!.canPop(), isFalse);
       expect(tester.takeException(), isNull);
     },
   );

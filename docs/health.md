@@ -49,7 +49,7 @@ flutter pub get
 flutter build ios --config-only --no-codesign
 ```
 
-Keep PiFitWatch's `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` aligned with the current `pubspec.yaml` version for each release; this revision uses `0.3.0` / `3`. The generated iPhone build settings must use the same version before archiving.
+Keep PiFitWatch's `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` aligned with the current `pubspec.yaml` version for each release; this revision uses `0.3.1` / `4`. The generated iPhone build settings must use the same version before archiving.
 
 1. Open `ios/Runner.xcworkspace`. Select the same Apple development team for Runner and PiFitWatch, with HealthKit enabled for both app IDs and valid provisioning profiles. Build Runner for a paired iPhone and build/run the PiFitWatch scheme on its paired watch. Confirm the embedded companion is installed.
 2. Open the Health screen without pressing Connect. Confirm no health prompt or data read occurs. Connect, grant selected read categories and compare real seven-day activity, timestamps and measurement units against the platform. Test denied/partial permissions and revoke access before refreshing.

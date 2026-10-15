@@ -234,7 +234,7 @@ void main() {
     await tester.ensureVisible(find.text('kg · external volume'));
     expect(metric('kg · external volume', '200'), findsOneWidget);
     await tester.ensureVisible(find.text('Sets by primary muscle'));
-    expect(find.text('1 set'), findsOneWidget);
+    expect(find.text('1 primary set'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -480,6 +480,246 @@ void main() {
     await store.updateUserProfile(store.profile.copyWith(sessionsPerWeek: 4));
     await tester.pumpAndSettle();
     expect(find.text('1 / 16 active days'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+    'Muscle shares follow the period and keep secondary work separate',
+    (tester) async {
+      final now = DateTime.now();
+      void add(
+        String id,
+        String exerciseId,
+        int daysAgo,
+        List<WorkoutSet> sets,
+      ) {
+        final start = DateTime(now.year, now.month, now.day - daysAgo);
+        store.history.add(
+          WorkoutSession(
+            id: id,
+            routineName: id,
+            startedAt: start,
+            finishedAt: start.add(const Duration(minutes: 30)),
+            exercises: [WorkoutExercise(exerciseId: exerciseId, sets: sets)],
+          ),
+        );
+      }
+
+      add('chest', 'bench_press', 1, const [
+        WorkoutSet(weight: 20, reps: 10, completed: true),
+        WorkoutSet(weight: 20, reps: 10, completed: true),
+        WorkoutSet(weight: 80, reps: 10, completed: false),
+        WorkoutSet(weight: 200, reps: 0, completed: true),
+      ]);
+      add('shoulders', 'lateral_raise', 9, const [
+        WorkoutSet(weight: 8, reps: 10, completed: true),
+      ]);
+      final calves = store.exercises.firstWhere(
+        (exercise) =>
+            exercise.muscle == 'Calves' && exercise.category == 'Strength',
+      );
+      add('calves', calves.id, 35, const [
+        WorkoutSet(weight: 20, reps: 10, completed: true),
+      ]);
+      await showScreen(
+        tester,
+        ProgressScreen(store: store),
+        width: 320,
+        textScale: 1.3,
+      );
+      String share(String muscle) => tester
+          .widget<Text>(find.byKey(ValueKey('muscle-focus-percent-$muscle')))
+          .data!;
+      expect(share('Chest'), '66.7%');
+      expect(share('Shoulders'), '33.3%');
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('muscle-focus-total')))
+            .data,
+        '3 completed strength sets · last 28 days',
+      );
+      final shoulder = find.byKey(
+        const ValueKey('muscle-focus-group-Shoulders'),
+      );
+      await tester.ensureVisible(shoulder);
+      await tester.tap(shoulder);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('muscle-detail-primary')))
+            .data,
+        '1 primary set',
+      );
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('muscle-detail-secondary')))
+            .data,
+        '2 secondary mentions',
+      );
+      expect(find.text('0 primary · 2 secondary'), findsOneWidget);
+      final close = find.text('Close breakdown');
+      await tester.ensureVisible(close);
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      for (final period in [7, 90]) {
+        final chip = find.byKey(ValueKey('period-$period'));
+        await tester.ensureVisible(chip);
+        await tester.tap(chip);
+        await tester.pumpAndSettle();
+        expect(share('Chest'), period == 7 ? '100.0%' : '50.0%');
+        expect(
+          tester
+              .widget<Text>(find.byKey(const ValueKey('muscle-focus-total')))
+              .data,
+          period == 7
+              ? '2 completed strength sets · last 7 days'
+              : '4 completed strength sets · last 90 days',
+        );
+      }
+      expect(share('Shoulders'), '25.0%');
+      expect(share('Calves'), '25.0%');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Every trained muscle appears without a top-six cutoff', (
+    tester,
+  ) async {
+    final byMuscle = <String, Exercise>{};
+    for (final exercise in store.exercises) {
+      if (exercise.category == 'Strength' && exercise.muscle != 'Cardio') {
+        byMuscle.putIfAbsent(exercise.muscle, () => exercise);
+      }
+    }
+    final chosen = byMuscle.values.take(7).toList();
+    final start = DateTime.now().subtract(const Duration(days: 1));
+    store.history.add(
+      WorkoutSession(
+        id: 'all-groups',
+        routineName: 'Varied training',
+        startedAt: start,
+        finishedAt: start.add(const Duration(minutes: 40)),
+        exercises: [
+          for (final exercise in chosen)
+            WorkoutExercise(
+              exerciseId: exercise.id,
+              sets: const [WorkoutSet(reps: 10, weight: 20, completed: true)],
+            ),
+        ],
+      ),
+    );
+    await showScreen(
+      tester,
+      ProgressScreen(store: store),
+      width: 320,
+      textScale: 1.3,
+    );
+    for (final exercise in chosen) {
+      final row = find.byKey(ValueKey('muscle-focus-group-${exercise.muscle}'));
+      expect(row, findsOneWidget);
+      await tester.ensureVisible(row);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(ValueKey('muscle-focus-percent-${exercise.muscle}')),
+            )
+            .data,
+        '14.3%',
+      );
+    }
+    final jump = find.byKey(const ValueKey('jump-muscle-focus'));
+    await tester.ensureVisible(jump);
+    await tester.tap(jump);
+    await tester.pumpAndSettle();
+    expect(find.text('Sets by primary muscle'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'No-data focus exposes every catalog group without invented percentages',
+    (tester) async {
+      await showScreen(
+        tester,
+        ProgressScreen(store: store),
+        width: 320,
+        textScale: 1.3,
+      );
+      expect(find.text('Your next set starts the picture.'), findsOneWidget);
+      final explore = find.byKey(const ValueKey('show-zero-muscle-groups'));
+      await tester.ensureVisible(explore);
+      await tester.tap(explore);
+      await tester.pumpAndSettle();
+      for (final muscle in [
+        'Abs',
+        'Adductors',
+        'Back',
+        'Biceps',
+        'Calves',
+        'Chest',
+        'Forearms',
+        'Glutes',
+        'Hamstrings',
+        'Neck',
+        'Quadriceps',
+        'Shoulders',
+        'Triceps',
+      ]) {
+        final row = find.byKey(ValueKey('muscle-focus-group-$muscle'));
+        expect(row, findsOneWidget);
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(ValueKey('muscle-focus-percent-$muscle')),
+              )
+              .data,
+          '—',
+        );
+      }
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('muscle-focus-group-Triceps')),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('An open muscle breakdown clears previous-account activity', (
+    tester,
+  ) async {
+    final start = DateTime.now().subtract(const Duration(days: 1));
+    store.history.add(
+      WorkoutSession(
+        id: 'private-set',
+        routineName: 'My training',
+        startedAt: start,
+        finishedAt: start.add(const Duration(minutes: 20)),
+        exercises: [
+          WorkoutExercise(
+            exerciseId: 'bench_press',
+            sets: const [WorkoutSet(weight: 30, reps: 10, completed: true)],
+          ),
+        ],
+      ),
+    );
+    await showScreen(
+      tester,
+      ProgressScreen(store: store),
+      width: 320,
+      textScale: 1.3,
+    );
+    final row = find.byKey(const ValueKey('muscle-focus-group-Chest'));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('muscle-detail-primary')), findsOneWidget);
+    await tester.runAsync(() => store.switchAccount('another-athlete'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('muscle-detail-primary')), findsNothing);
+    expect(find.text(store.exerciseById('bench_press').name), findsNothing);
+    expect(
+      find.text(
+        'Your account changed. Close this breakdown to view the current profile.',
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

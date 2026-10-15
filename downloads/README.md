@@ -3,11 +3,11 @@
 - [Download Android ARM64 (most phones, 25.4 MB)](https://github.com/davidpitutiu/Pi-Fit/raw/refs/heads/main/downloads/Pi-Fit-Android-arm64.apk)
 - [Download Android ARMv7 (32-bit phones, 23.5 MB)](https://github.com/davidpitutiu/Pi-Fit/raw/refs/heads/main/downloads/Pi-Fit-Android-armv7.apk)
 
-Version **0.3.0**, package `com.pifit.app`, Android 8.0/API 26 or newer.
+Version **0.3.1**, package `com.pifit.app`, Android 8.0/API 26 or newer.
 Release-mode test builds, signed with the same debug key as the earlier Pi Fit
 builds. They can update that installation and are not store-signed releases.
 
-This version adds an English interface, original vector exercise art, per-set
+This version fixes the signup navigation crash and adds muscle-focus charts. It includes an English interface, exercise icons, per-set
 RPE effort ratings and live advice, shared rest/workout timers, notification
 shortcuts, coach proposals you can apply, height/weight history, and themed PDF
 exports for custom dates or all time. The 878-exercise catalog and workout filters

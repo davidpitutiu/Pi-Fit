@@ -50,7 +50,7 @@ void main() {
   }
 
   testWidgets(
-    'exercise search supports accents and English aliases with offline pose gallery',
+    'exercise search supports accents and English aliases with an offline icon detail',
     (tester) async {
       phoneSize(tester);
       final store = await newStore();
@@ -69,11 +69,14 @@ void main() {
       expect(find.text('Barbell Bench Press - Medium Grip'), findsOneWidget);
       await tester.tap(find.text('Barbell Bench Press - Medium Grip'));
       await tester.pumpAndSettle();
-      expect(find.text('1/2'), findsOneWidget);
-      await tester.drag(find.byType(PageView), const Offset(-320, 0));
-      await tester.pumpAndSettle();
-      expect(find.text('2/2'), findsOneWidget);
-      expect(find.text(exerciseIllustrationCredit), findsOneWidget);
+      expect(find.byType(PageView), findsNothing);
+      expect(
+        find.text(
+          'Exercise icon. Follow the written instructions for technique.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(exerciseIconCredit), findsOneWidget);
       await tester.drag(find.byType(ListView).last, const Offset(0, -300));
       await tester.pumpAndSettle();
       expect(find.text('Secondary muscles'), findsOneWidget);

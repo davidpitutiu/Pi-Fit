@@ -2472,7 +2472,11 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
         children: [
           Stack(
             children: [
-              _ExerciseGallery(exercise: exercise),
+              ExerciseImage(
+                exercise: exercise,
+                height: 208,
+                borderRadius: BorderRadius.circular(24),
+              ),
               Positioned(
                 top: 8,
                 right: 8,
@@ -2504,14 +2508,14 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
-              exerciseIllustrationCredit,
+              exerciseIconCredit,
               style: TextStyle(fontSize: 9, color: PiColors.muted(context)),
             ),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 5),
             child: Text(
-              'Movement-family illustration. Follow the exercise instructions for this variation.',
+              'Exercise icon. Follow the written instructions for technique.',
               style: TextStyle(
                 fontSize: 9,
                 height: 1.5,
@@ -2726,87 +2730,6 @@ class _ExerciseDetailState extends State<_ExerciseDetail> {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _ExerciseGallery extends StatefulWidget {
-  const _ExerciseGallery({required this.exercise});
-  final Exercise exercise;
-
-  @override
-  State<_ExerciseGallery> createState() => _ExerciseGalleryState();
-}
-
-class _ExerciseGalleryState extends State<_ExerciseGallery> {
-  int _page = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final count = exerciseIllustrationPoseCount(widget.exercise);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: SizedBox(
-        height: 232,
-        child: Stack(
-          children: [
-            PageView.builder(
-              itemCount: count,
-              onPageChanged: (value) => setState(() => _page = value),
-              itemBuilder: (_, index) => ExerciseImage(
-                exercise: widget.exercise,
-                imageIndex: index,
-                fit: BoxFit.contain,
-                borderRadius: BorderRadius.zero,
-              ),
-            ),
-            if (count > 1)
-              Positioned(
-                bottom: 12,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: .64),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (var index = 0; index < count; index++)
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            margin: const EdgeInsets.symmetric(horizontal: 3),
-                            width: _page == index ? 15 : 5,
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: _page == index
-                                  ? PiColors.lime
-                                  : Colors.white54,
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        const SizedBox(width: 7),
-                        Text(
-                          '${_page + 1}/$count',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }

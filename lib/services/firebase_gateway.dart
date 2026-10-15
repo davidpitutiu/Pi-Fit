@@ -14,25 +14,36 @@ class FirebaseGateway {
     Future<FirebaseApp> Function(FirebaseOptions)? initializer,
     FirebaseAuth? authOverride,
     Duration initializationTimeout = const Duration(seconds: 10),
+    Duration authOperationTimeout = const Duration(seconds: 20),
+    Duration accountSetupTimeout = const Duration(seconds: 10),
   }) : _initializer = initializer ?? _initializeSdk,
        _authOverride = authOverride,
-       _initializationTimeout = initializationTimeout;
+       _initializationTimeout = initializationTimeout,
+       _authOperationTimeout = authOperationTimeout,
+       _accountSetupTimeout = accountSetupTimeout;
 
   @visibleForTesting
   factory FirebaseGateway.forTesting({
     required Future<FirebaseApp> Function(FirebaseOptions) initializer,
     FirebaseAuth? auth,
     Duration initializationTimeout = const Duration(seconds: 10),
+    Duration authOperationTimeout = const Duration(seconds: 20),
+    Duration accountSetupTimeout = const Duration(seconds: 10),
   }) => FirebaseGateway._(
     initializer: initializer,
     authOverride: auth,
     initializationTimeout: initializationTimeout,
+    authOperationTimeout: authOperationTimeout,
+    accountSetupTimeout: accountSetupTimeout,
   );
 
   static final FirebaseGateway instance = FirebaseGateway._();
   final Future<FirebaseApp> Function(FirebaseOptions) _initializer;
   final FirebaseAuth? _authOverride;
   final Duration _initializationTimeout;
+  final Duration _authOperationTimeout;
+  final Duration _accountSetupTimeout;
+  final Map<String, String> _registrationWarnings = {};
   FirebaseApp? _app;
   String? _configurationIssue;
 
@@ -48,6 +59,10 @@ class FirebaseGateway {
   User? get currentUser => configured ? _auth.currentUser : null;
   Stream<User?> get authStateChanges =>
       configured ? _auth.authStateChanges() : Stream<User?>.value(null);
+
+  /// Optional post-registration work never hides a successfully created UID.
+  /// A warning belongs only to that account, even if Auth changes meanwhile.
+  String? registrationWarningFor(String uid) => _registrationWarnings[uid];
 
   static Future<FirebaseApp> _initializeSdk(FirebaseOptions options) =>
       Firebase.initializeApp(options: options);
@@ -182,44 +197,64 @@ class FirebaseGateway {
   }
 
   Future<String> signIn(String email, String password) async {
-    final result = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
+    final result = await _auth
+        .signInWithEmailAndPassword(email: email.trim(), password: password)
+        .timeout(
+          _authOperationTimeout,
+          onTimeout: () => throw StateError(
+            'Sign-in is taking too long. The request was not cancelled and '
+            'may still finish. Check Profile before trying again.',
+          ),
+        );
     final user = result.user;
     if (user == null) throw StateError('Sign-in did not return an account.');
     return user.uid;
   }
 
   Future<String> signUp(String email, String password, String name) async {
-    final result = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
+    final result = await _auth
+        .createUserWithEmailAndPassword(email: email.trim(), password: password)
+        .timeout(
+          _authOperationTimeout,
+          onTimeout: () => throw StateError(
+            'Registration is taking too long. The request was not cancelled '
+            'and may still finish. Check Profile before trying again.',
+          ),
+        );
     final user = result.user;
     if (user == null) {
       throw StateError('Registration did not return an account.');
     }
     final createdUid = user.uid;
-    try {
+    _registrationWarnings.remove(createdUid);
+    var setupStopped = false;
+    Future<void> completeSetup() async {
       _requireSameUser(createdUid);
       if (name.trim().isNotEmpty) {
         await user.updateDisplayName(name.trim());
       }
+      // A timeout cannot cancel an SDK request. In particular, a late name
+      // update must not start a verification email after this flow finished.
+      if (setupStopped) return;
       _requireSameUser(createdUid);
       await user.sendEmailVerification();
-    } catch (_) {
+      _requireSameUser(createdUid);
+    }
+
+    try {
+      await completeSetup().timeout(_accountSetupTimeout);
+    } catch (error) {
+      setupStopped = true;
       if (currentUser?.uid != createdUid) {
         throw StateError(
           'The account was created, but the active account changed before '
           'setup finished. Sign in to the created account to continue.',
         );
       }
-      throw StateError(
-        'Your account was created and you are signed in, but profile setup '
-        'or the verification email could not be completed. '
-        'You can resend verification from Profile.',
-      );
+      _registrationWarnings[createdUid] =
+          'Your account was created and you are signed in. Profile setup or '
+          'the verification email ${error is TimeoutException ? 'did not finish in time' : 'could not be completed'}. '
+          'You can update your name or resend verification from Profile.';
     }
     return createdUid;
   }
