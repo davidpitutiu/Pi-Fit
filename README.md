@@ -21,7 +21,40 @@ Aceasta este o primă versiune funcțională, nu paritate integrală cu Hevy. Fe
 
 ## Pornire
 
-Flutter **3.47.7 / Dart 3.13.5**. În mediul cloud, SDK-ul este `/workspace/flutter-sdk`; `scripts/flutterw` gestionează directoarele cache fără să schimbe `HOME`.
+Flutter **3.47.7 / Dart 3.13.5**.
+
+### Windows — PowerShell
+
+Instalează [SDK-ul Flutter pentru Windows](https://docs.flutter.dev/install/manual)
+și adaugă folderul `flutter\bin` în PATH. După modificarea PATH, redeschide
+PowerShell și intră în folderul proiectului. Rulează comenzile direct:
+
+```powershell
+flutter --version
+flutter doctor
+flutter pub get --enforce-lockfile
+flutter analyze
+flutter test
+flutter run -d chrome
+```
+
+`scripts/flutterw` este un script Bash pentru mediul cloud Linux. În PowerShell,
+executarea lui afișează dialogul „Select an app to open flutterw”; închide dialogul
+și folosește comenzile `flutter` de mai sus. Dacă `flutter` nu este recunoscut,
+verifică instalarea SDK-ului și PATH înainte să continui. Pentru verificarea în
+Chrome este suficient toolchainul web; Android Studio este necesar pentru dezvoltarea
+Android, iar iOS se compilează pe macOS.
+
+Comanda pentru Chrome pornește aplicația în modul local. Loginul și backupul în
+browser necesită și înregistrarea unei aplicații Web în Firebase și completarea
+`FIREBASE_WEB_APP_ID` și `FIREBASE_WEB_API_KEY` în configurația locală; fișierele
+Android/iOS nu conțin aceste valori. Încarcă apoi configurația prin
+`flutter run -d chrome --dart-define-from-file=firebase/client-config.local.json`.
+
+### Mediul cloud Linux
+
+SDK-ul este `/workspace/flutter-sdk`; `scripts/flutterw` gestionează directoarele
+cache fără să schimbe `HOME`.
 
 ```bash
 cd /workspace/Pi-Fit
@@ -31,7 +64,12 @@ cd /workspace/Pi-Fit
 ./scripts/flutterw run -d chrome
 ```
 
-Pe calculatorul personal cu Flutter în PATH poți folosi comenzile `flutter` direct. Pentru Android: Java 17+, Android SDK API 36, acceptarea licențelor și emulator/dispozitiv. Pentru iOS: macOS, Xcode, CocoaPods și semnare Apple. Scaffoldingul folosește Android minSdk 24 și iOS 15.0.
+### Rulare și builduri mobile
+
+Pe calculatorul personal folosește comenzile `flutter` direct. Pentru Android:
+Java 17+, Android SDK API 36, acceptarea licențelor și emulator/dispozitiv.
+Pentru iOS: macOS, Xcode, CocoaPods și semnare Apple. Scaffoldingul folosește
+Android minSdk 24 și iOS 15.0.
 
 ```bash
 flutter run -d <device-id>
@@ -65,9 +103,9 @@ Backupul este explicit/manual și înlocuiește documentul curent al contului. D
 ## Verificări
 
 ```bash
-./scripts/flutterw analyze
-./scripts/flutterw test
-./scripts/flutterw build web
+flutter analyze
+flutter test
+flutter build web
 cd firebase/functions
 npm ci
 npm test
