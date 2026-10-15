@@ -71,9 +71,6 @@ void main() {
       expect(report.ratedSets, 572);
       final bytes = await ReportExportService().buildPdf(report, dark: true);
       expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
-      print(
-        'Payload validated: 36 workouts, 572 sets, 7/28/90 counts=$counts; PDF bytes=${bytes.length}',
-      );
     },
   );
 }
